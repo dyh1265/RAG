@@ -1,0 +1,182 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "advanced-rag"
+version = "0.1.0"
+description = "Production-grade multimodal RAG learning project: PDFs to chat, ingestion to evaluation."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "DYH"}]
+keywords = [
+    "rag",
+    "retrieval-augmented-generation",
+    "multimodal",
+    "qdrant",
+    "colpali",
+    "llm",
+    "fastapi",
+    "celery",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/dyh/advanced-rag"
+Repository = "https://github.com/dyh/advanced-rag"
+Issues = "https://github.com/dyh/advanced-rag/issues"
+
+# Core deps shared across all phases.
+# Phase-specific deps are installed per phase to avoid conflicts.
+dependencies = [
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "python-dotenv>=1.0",
+    "structlog>=24.0",
+    "rich>=13.0",
+    "tqdm>=4.0",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+
+# Phase 1: Multimodal ingestion
+phase1 = [
+    "pymupdf>=1.24",
+    "pdf2image>=1.17",
+    "Pillow>=10.0",
+    "pdfplumber>=0.11",
+    "pytesseract>=0.3",
+    "Pillow>=10.0",
+    "surya-ocr>=0.6",
+    "open_clip_torch>=2.24",
+    "sentence-transformers>=3.0",
+    "qdrant-client>=1.12.0,<1.13.0",
+    "colpali-engine>=0.3",
+    "python-docx>=1.1",
+    "langchain-qdrant>=0.1",
+    "pytest>=8.0",
+]
+
+# Phase 2: Long-document retrieval
+phase2 = [
+    "rank-bm25>=0.2",
+    "langchain-text-splitters>=0.3",
+    "tiktoken>=0.7",
+    "flashrank>=0.2",
+]
+
+# Phase 3: Scalable ingestion
+phase3 = [
+    "redis>=5.0",
+    "datasketch>=1.6",
+    "prometheus-client>=0.20",
+    "aiofiles>=23.0",
+    "celery[redis]>=5.4",
+]
+
+# Phase 4: Taxonomy validation
+phase4 = [
+    "rdflib>=7.0",
+    "owlready2>=0.46",
+    "rapidfuzz>=3.0",
+    "networkx>=3.3",
+]
+
+# Phase 5: Evaluation
+phase5 = [
+    "ragas>=0.1",
+    "deepeval>=0.21",
+    "datasets>=2.19",
+    "scikit-learn>=1.5",
+    "scipy>=1.13",
+    "plotly>=5.22",
+    "jinja2>=3.1",
+]
+
+# Phase 6: Production
+phase6 = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "presidio-analyzer>=2.2",
+    "presidio-anonymizer>=2.2",
+    "spacy>=3.7",
+    "opentelemetry-sdk>=1.24",
+    "opentelemetry-exporter-otlp>=1.24",
+    "opentelemetry-instrumentation-fastapi>=0.45",
+    "slowapi>=0.1",
+    "tenacity>=8.3",
+    "prometheus-client>=0.20",
+    "qdrant-client>=1.12.0,<1.13.0",
+    "redis>=5.0",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+    "locust>=2.28",
+]
+
+# Capstone: DocuMind
+capstone = [
+    "streamlit>=1.35",
+]
+
+# Jupyter notebooks (phase walkthroughs)
+notebooks = [
+    "jupyterlab>=4.0",
+    "ipykernel>=6.29",
+    "matplotlib>=3.8",
+]
+
+# Everything
+all = [
+    "advanced-rag[phase1,phase2,phase3,phase4,phase5,phase6,notebooks]",
+]
+
+[project.scripts]
+documind = "capstone.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: tests that require sample PDF or external services",
+]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    "notebooks",      # ruff's notebook schema check rejects valid Jupyter outputs
+    ".venv",
+    "venv",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# CLI / demo entrypoints intentionally call sys.path.insert before importing
+# project modules so they can be run as bare scripts (not just via `python -m`).
+"capstone/cli.py" = ["E402"]
+"capstone/run_exit_test.py" = ["E402"]
+"phases/*/demo.py" = ["E402"]
+"phases/*/run_exit_test.py" = ["E402"]
+"phases/phase_03_scalable_ingestion/bulk_ingest.py" = ["E402"]
+"phases/phase_05_evaluation/run_full_eval.py" = ["E402"]
+# Re-export shims expose their contents via `__all__`
+"documind/**/__init__.py" = ["F401"]
+"shared/__init__.py" = ["F401"]

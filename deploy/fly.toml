@@ -1,0 +1,40 @@
+# Fly.io config for rag-api (split-cloud demo).
+# From repo root: fly launch --no-deploy && fly secrets set ... && fly deploy
+#
+# Requires Qdrant Cloud + Upstash Redis URLs in secrets (see deploy/README.md).
+
+app = "documind-rag-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "docker/Dockerfile"
+
+[env]
+  USE_COLPALI = "false"
+  EMBEDDING_DEVICE = "cpu"
+  USE_HYBRID = "true"
+  USE_RECURSIVE_CHUNKER = "true"
+  USE_TAXONOMY_VALIDATION = "true"
+  USE_PII_REDACTION = "true"
+  USE_PII_REDACTION_ON_INGEST = "true"
+  USE_OCR = "true"
+  API_WARMUP_MODELS = "true"
+  LOG_LEVEL = "INFO"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 25
+    soft_limit = 20
+
+[[vm]]
+  memory = "2048mb"
+  cpu_kind = "shared"
+  cpus = 2

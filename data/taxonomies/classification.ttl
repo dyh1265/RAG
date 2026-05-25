@@ -1,0 +1,28 @@
+@prefix ex: <http://rag.example/taxonomy#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# Allowed document classification labels (enterprise data handling)
+ex:PUBLIC a ex:ClassificationLabel ;
+    rdfs:label "PUBLIC" ;
+    ex:level 1 .
+
+ex:INTERNAL a ex:ClassificationLabel ;
+    rdfs:label "INTERNAL" ;
+    ex:level 2 .
+
+ex:CONFIDENTIAL a ex:ClassificationLabel ;
+    rdfs:label "CONFIDENTIAL" ;
+    ex:level 3 .
+
+# Explicitly forbidden labels — must never appear in answers
+ex:SECRET a ex:ForbiddenLabel ;
+    rdfs:label "SECRET" .
+
+ex:TOP-SECRET a ex:ForbiddenLabel ;
+    rdfs:label "TOP SECRET" .
+
+ex:SECRET-TOP-SECRET a ex:ForbiddenLabel ;
+    rdfs:label "SECRET-TOP-SECRET" .
+
+ex:TOP-SECRET-SCI a ex:ForbiddenLabel ;
+    rdfs:label "TOP SECRET SCI" .
