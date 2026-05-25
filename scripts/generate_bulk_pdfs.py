@@ -1,5 +1,5 @@
 """
-Generate a folder of unique PDFs for Phase 3 bulk-ingest testing.
+Generate a folder of unique PDFs for bulk-ingest testing (Celery worker pipeline).
 
 Usage (Docker — preferred):
     cd docker
@@ -70,7 +70,7 @@ def _build_one(index: int) -> fitz.Document:
         f"the second half of the year. Product investments focused on AI-assisted workflows "
         f"and deeper integrations with ERP and CRM systems.\n\n"
         f"Document ID: bulk-report-{index:04d}. This synthetic report is generated for "
-        f"Phase 3 scalable ingestion testing. Each file has a unique filename and content "
+        f"bulk-ingest testing. Each file has a unique filename and content "
         f"so Qdrant receives distinct doc_id values during bulk ingest benchmarks."
     )
     _add_text(page, y, body)

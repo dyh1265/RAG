@@ -2,7 +2,7 @@
 Unified RAG pipeline — single entry point for ingest and query.
 
 Demo, eval, and API should all call RAGPipeline rather than wiring
-phase components directly.
+ingestion / retrieval / scaling components directly.
 """
 
 from __future__ import annotations
@@ -17,13 +17,17 @@ from backend.ingestion.embeddings.colpali_embedder import ColPaliEmbedder
 from backend.ingestion.embeddings.image_embedder import ImageEmbedder
 from backend.ingestion.embeddings.multimodal_embed import embed_chunks
 from backend.ingestion.embeddings.text_embedder import TextEmbedder
-from backend.ingestion.generation.answer_generator import AnswerGenerator
+from backend.generation.answer_generator import AnswerGenerator
 from backend.ingestion.parsers.base_parser import stable_doc_id
-from backend.ingestion.retrieval.multimodal_retriever import MultiModalRetriever
-from backend.ingestion.retrieval.reranker import CrossEncoderReranker
 from backend.ingestion.stores.qdrant_store import COLLECTION_MAP, QdrantStore, page_index_status
-from backend.retrieval.ingest import Phase2IngestConfig, apply_phase2_ingest, invalidate_phase2_caches
-from backend.retrieval.retrieval.flashrank_reranker import FlashRankReranker
+from backend.retrieval.cross_encoder_reranker import CrossEncoderReranker
+from backend.retrieval.flashrank_reranker import FlashRankReranker
+from backend.retrieval.multimodal_retriever import MultiModalRetriever
+from backend.retrieval.preprocessing import (
+    RetrievalIngestConfig,
+    apply_retrieval_ingest,
+    invalidate_retrieval_caches,
+)
 from backend.scaling.pipeline.ingest_modes import IngestMode, build_ingestion_pipeline
 
 
@@ -59,7 +63,7 @@ class IngestResult:
 
 class RAGPipeline:
     """
-    Multimodal RAG pipeline: parse → (Phase 2 enrich) → embed → store → retrieve → answer.
+    Multimodal RAG pipeline: parse → enrich → embed → store → retrieve → answer.
 
     Usage
     -----
@@ -170,7 +174,7 @@ class RAGPipeline:
             return None
         return page_index_status(self.store, use_colpali=True)
 
-    def _phase2_enabled(self) -> bool:
+    def _retrieval_enrichment_enabled(self) -> bool:
         return (
             self.config.use_section_paths
             or self.config.use_recursive_chunker
@@ -183,11 +187,11 @@ class RAGPipeline:
         pdf_path = Path(path)
         chunks, errors = self._ingestion.parse_safe(pdf_path)
 
-        if self._phase2_enabled():
-            chunks = apply_phase2_ingest(
+        if self._retrieval_enrichment_enabled():
+            chunks = apply_retrieval_ingest(
                 chunks,
                 pdf_path,
-                Phase2IngestConfig(
+                RetrievalIngestConfig(
                     use_section_paths=self.config.use_section_paths,
                     use_recursive_chunker=self.config.use_recursive_chunker,
                     use_semantic_chunker=self.config.use_semantic_chunker,
@@ -218,7 +222,7 @@ class RAGPipeline:
 
         doc_id = stable_doc_id(pdf_path)
         self.store.delete_doc(doc_id)
-        invalidate_phase2_caches(doc_id)
+        invalidate_retrieval_caches(doc_id)
         embedded = embed_chunks(
             chunks,
             self.text_embedder,

@@ -11,7 +11,7 @@ class CrossEncoderReranker:
     Re-score (query, passage) pairs with a cross-encoder.
 
     Install: pip install sentence-transformers
-    Default model: BAAI/bge-reranker-v2-m3 (from shared/config.py)
+    Default model: BAAI/bge-reranker-v2-m3 (see backend/core/config.py).
     """
 
     def __init__(self, model_name: str | None = None, device: str | None = None) -> None:

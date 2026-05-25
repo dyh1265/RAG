@@ -1,56 +1,63 @@
-# DocuMind Web — Node.js frontend
+# DocuMind Web — React + Vite frontend
 
-React + Vite SPA for the DocuMind backend API. Upload PDFs, chat with citations, and see taxonomy conformity warnings.
+React + Vite SPA for the DocuMind backend API. Upload PDFs, chat with citations, see taxonomy conformity warnings.
 
-> **Docker-first.** Run all npm commands from `docker/` — no local Node install required.
+> **Docker-first.** Run npm commands from `docker/` if you don't want a local Node install.
 
-## Quick start (dev with hot reload)
+## Quick start (production demo, Cloudflare-style)
 
 ```powershell
 cd docker
-docker compose --profile production up -d qdrant redis rag-api documind-web-dev
+docker compose --profile production up -d --build
 ```
 
-Open http://localhost:5173 — Vite proxies `/api` → `rag-api:8000` inside the compose network.
+Open **http://localhost** — the `documind-web` container serves the bundle on port 80 and proxies `/api/*` to `rag-api` inside the compose network.
+
+## Frontend hot reload (dev)
+
+```powershell
+cd docker
+docker compose --profile dev up -d --build
+```
+
+Open **http://localhost:5173** — Vite proxies `/api` → `rag-api:8000` inside the compose network.
 
 ## npm via Docker
 
-One-off commands (install, build, test):
+One-off commands (install, build, test) — uses the `dev` profile container:
 
 ```powershell
 cd docker
 
 # Install / refresh dependencies (writes to documind_node_modules volume)
-docker compose --profile production run --rm documind-web-dev npm install
+docker compose --profile dev run --rm documind-web-dev npm install
 
 # Production build (output in frontend/dist on host via bind mount)
-docker compose --profile production run --rm documind-web-dev npm run build
+docker compose --profile dev run --rm documind-web-dev npm run build
 
 # Interactive shell
-docker compose --profile production run --rm documind-web-dev sh
+docker compose --profile dev run --rm documind-web-dev sh
 ```
 
-## Production static build (nginx)
+## Local Node toolchain
 
-```powershell
-cd docker
-docker compose --profile production build documind-web
-docker compose --profile production up -d qdrant redis rag-api documind-web
+```bash
+cd frontend
+npm install
+npm run dev      # http://localhost:5173, proxies /api -> http://localhost:8002
+npm run build    # outputs dist/
 ```
-
-UI: http://localhost:5174 (nginx serving the built bundle)
-
-Build arg `VITE_RAG_API_URL` sets the API URL baked into the bundle (default `http://localhost:8002` for browser → host port 8002).
 
 ## Configuration
 
-| Variable | Default (Docker dev) | Purpose |
-|----------|----------------------|---------|
-| `VITE_RAG_API_URL` | `/api` in dev | Backend API base URL in browser |
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `VITE_RAG_API_URL` | `/api` (compose builds), `http://localhost:8002` (Dockerfile fallback) | Backend API base URL in browser |
 | `VITE_DEV_API_PROXY` | `http://rag-api:8000` | Vite dev proxy target inside compose |
+| `VITE_DEMO_UI` | `true` (compose default) | Hide developer-only UI (API URL field, debug footer) |
 | `DOCKER` | `true` in compose | Fallback proxy to `rag-api:8000` |
 
-The sidebar API URL is persisted in `localStorage`. Leave default `/api` in dev mode.
+The sidebar API URL (developer mode only) is persisted in `localStorage`.
 
 ## Features
 

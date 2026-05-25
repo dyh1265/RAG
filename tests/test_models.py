@@ -1,5 +1,5 @@
 """
-Tests for shared/models.py — verifies the core data contracts are sound.
+Tests for backend/core/models.py — verifies the core data contracts are sound.
 Run: pytest tests/test_models.py
 """
 

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from backend.retrieval.retrieval.parent_expand import collect_parent_ids, expand_to_parents
+from backend.retrieval.parent_expand import collect_parent_ids, expand_to_parents
 from backend.core.models import ChunkType, DocumentChunk, DocumentType, RetrievalStrategy, RetrievedContext
-from tests.ingestion.conftest import make_context
+from tests._factories import make_context
 
 
 def test_collect_parent_ids():

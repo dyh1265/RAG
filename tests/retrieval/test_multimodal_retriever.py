@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 
-from backend.ingestion.retrieval.multimodal_retriever import (
+from backend.retrieval.multimodal_retriever import (
     MultiModalRetriever,
     _collection_weights,
     _dedupe_by_content,
@@ -13,7 +13,7 @@ from backend.ingestion.retrieval.multimodal_retriever import (
 )
 from backend.ingestion.stores.qdrant_store import COLLECTION_MAP
 from backend.core.models import ChunkType, QueryRequest
-from tests.ingestion.conftest import make_context
+from tests._factories import make_context
 
 
 def test_reciprocal_rank_fusion_orders_by_rank_within_list():
@@ -116,7 +116,7 @@ def test_multimodal_retriever_searches_all_collections():
 def test_resolve_query_vector_falls_back_when_page_chunks_not_colpali():
     import warnings
 
-    from backend.ingestion.retrieval.multimodal_retriever import _ModalitySearch
+    from backend.retrieval.multimodal_retriever import _ModalitySearch
 
     store = MagicMock()
     store.collection_vector_size.return_value = 1024
@@ -151,7 +151,7 @@ def test_resolve_query_vector_falls_back_when_page_chunks_not_colpali():
 
 
 def test_hybrid_text_search_merges_page_chunks_when_not_colpali():
-    from tests.ingestion.conftest import make_chunk
+    from tests._factories import make_chunk
 
     store = MagicMock()
     page_chunk = make_chunk(
@@ -195,7 +195,7 @@ def test_hybrid_text_search_merges_page_chunks_when_not_colpali():
                 )
             ]
 
-    import backend.retrieval.retrieval.hybrid_retriever as hybrid_mod
+    import backend.retrieval.hybrid_retriever as hybrid_mod
 
     original = hybrid_mod.HybridRetriever
     hybrid_mod.HybridRetriever = FakeHybrid

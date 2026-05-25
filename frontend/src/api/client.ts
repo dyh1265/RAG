@@ -25,8 +25,11 @@ export function loadApiBase(): string {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) {
     const normalized = stored.replace(/\/$/, "");
-    // Prefer same-origin proxy on prod UI (5174) — cross-port fetch often fails in embedded browsers.
-    if (normalized === "http://localhost:8002" && window.location.port === "5174") {
+    // When the SPA is served same-origin, prefer the `/api` proxy: cross-port
+    // fetch from a hashed Vite bundle to a different host port often fails in
+    // embedded browsers (e.g. the Cloudflare Tunnel preview).
+    const sameOrigin = window.location.protocol === "http:" || window.location.protocol === "https:";
+    if (sameOrigin && normalized === "http://localhost:8002" && window.location.port !== "8002") {
       return "/api";
     }
     return normalized;

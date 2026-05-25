@@ -7,7 +7,11 @@ from pathlib import Path
 
 from backend.ingestion.parsers.base_parser import stable_doc_id
 from backend.ingestion.stores.qdrant_store import COLLECTION_MAP
-from backend.retrieval.ingest import Phase2IngestConfig, apply_phase2_ingest, invalidate_phase2_caches
+from backend.retrieval.preprocessing import (
+    RetrievalIngestConfig,
+    apply_retrieval_ingest,
+    invalidate_retrieval_caches,
+)
 from backend.scaling.embedding.cached_embed import embed_chunks_cached
 from backend.scaling.embedding.dedup import deduplicate_chunks
 from backend.scaling.embedding.fingerprint import chunk_embed_key, doc_fingerprint
@@ -66,11 +70,11 @@ def scalable_ingest(
     ingestion = build_ingestion_pipeline(cfg.mode)
     chunks, errors = ingestion.parse_safe(pdf_path)
 
-    if pipeline._phase2_enabled():
-        chunks = apply_phase2_ingest(
+    if pipeline._retrieval_enrichment_enabled():
+        chunks = apply_retrieval_ingest(
             chunks,
             pdf_path,
-            Phase2IngestConfig(
+            RetrievalIngestConfig(
                 use_section_paths=pipeline.config.use_section_paths,
                 use_recursive_chunker=pipeline.config.use_recursive_chunker,
                 use_semantic_chunker=pipeline.config.use_semantic_chunker,
@@ -101,7 +105,7 @@ def scalable_ingest(
 
     try:
         pipeline.store.delete_doc(doc_id)
-        invalidate_phase2_caches(doc_id)
+        invalidate_retrieval_caches(doc_id)
         embedded, embed_stats = embed_chunks_cached(
             chunks,
             pipeline.text_embedder,
@@ -149,7 +153,7 @@ def build_pipeline_from_flags(
     use_colpali: bool = False,
     provider: str = "openai",
 ) -> RAGPipeline:
-    """Construct RAGPipeline with Phase 2 + optional ColPali flags."""
+    """Construct RAGPipeline with retrieval enrichment + optional ColPali flags."""
     from backend.core.config import get_settings
 
     settings = get_settings()

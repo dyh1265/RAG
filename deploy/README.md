@@ -98,9 +98,9 @@ CORS on the API is already `allow_origins=["*"]`.
 **Fastest free demo** if your Windows machine can stay on during the demo.
 
 ```powershell
-# Terminal 1 — start stack locally
+# Terminal 1 — start stack locally (UI + /api on http://localhost)
 cd docker
-docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile production up -d --build
+docker compose --profile production up -d --build
 ```
 
 Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/), then run from a new terminal:
@@ -170,7 +170,7 @@ ssh ubuntu@YOUR_PUBLIC_IP
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
-git clone https://github.com/YOUR_USER/RAG.git ~/RAG   # or scp your local copy
+git clone https://github.com/dyh1265/RAG.git ~/RAG   # or scp your local copy
 cd ~/RAG
 cp deploy/.env.demo.example .env
 nano .env   # set OPENAI_API_KEY=sk-...
@@ -186,7 +186,7 @@ Or manually:
 
 ```bash
 cd ~/RAG/docker
-docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile production up -d --build
+docker compose --profile production up -d --build
 ```
 
 **First start:** Docker builds the API image and downloads embedding models (~15–30 min on ARM). The API warms models on boot (`API_WARMUP_MODELS=true`).
@@ -221,7 +221,13 @@ demo.yourdomain.com {
 }
 ```
 
-Change `docker-compose.demo.yml` to map `documind-web` to `127.0.0.1:8080:80` instead of `80:80` so Caddy can bind 443.
+Override the `documind-web` port mapping so Caddy can bind `:443` itself. The compose file reads `DOCUMIND_WEB_PORT`, default `80:80`:
+
+```bash
+DOCUMIND_WEB_PORT=127.0.0.1:8080:80 docker compose --profile production up -d
+```
+
+Persist that override by exporting `DOCUMIND_WEB_PORT` in your shell profile or putting it in `.env` (compose reads `.env` automatically).
 
 ### 6. Operations
 
@@ -229,21 +235,77 @@ Change `docker-compose.demo.yml` to map `documind-web` to `127.0.0.1:8080:80` in
 cd ~/RAG/docker
 
 # Logs
-docker compose -f docker-compose.yml -f docker-compose.demo.yml logs -f rag-api documind-web
+docker compose logs -f rag-api documind-web
 
 # Restart after .env change
-docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile production up -d --build rag-api
+docker compose --profile production up -d --build rag-api
 
 # Stop demo
-docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile production down
+docker compose --profile production down
 ```
 
 ### Security notes (public demo)
 
-- `docker-compose.demo.yml` binds Qdrant, Redis, and rag-api to **127.0.0.1** only.
+- `docker/docker-compose.yml` binds Qdrant, Redis, and rag-api to **127.0.0.1** by default.
+- Only the `documind-web` container is exposed publicly (port 80 → SPA + `/api` proxy).
 - Do **not** open ports 6333, 6379, or 8002 in Oracle ingress.
 - Rotate `OPENAI_API_KEY` if the demo is abused; set Oracle billing alerts.
 - PII redaction is on by default in production compose.
+
+### 7. Teardown / cleanup
+
+**Cloudflare Tunnel (Windows):**
+
+```powershell
+# Stop the tunnel: Ctrl-C in the cloudflared window, or
+Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process
+
+# Stop Docker stack but keep volumes (Qdrant data, model cache survive)
+cd C:\path\to\RAG\docker
+docker compose --profile production --profile dev down
+
+# Drop legacy/orphan services from previous compose versions (e.g. rag_nginx)
+docker compose --profile production --profile dev down --remove-orphans
+
+# Full reset — wipes ingested chunks, embeddings, model cache, dashboards
+docker compose --profile production --profile dev down -v --remove-orphans
+```
+
+**Oracle / VM:**
+
+```bash
+cd ~/RAG/docker
+
+docker compose --profile production down                    # stop demo, keep data
+docker compose --profile production down --remove-orphans   # drop legacy services
+docker compose --profile production down -v --remove-orphans  # full reset
+
+# Reclaim disk on small VMs (build cache, dangling images)
+docker system prune -f
+docker builder prune -f
+```
+
+**Split cloud (Fly + Qdrant Cloud + Upstash + Vercel):**
+
+```bash
+# Tear down the Fly app (stops billing on rag-api machine)
+fly apps destroy documind-rag-api
+
+# Optional: Vercel project, Qdrant cluster, Upstash DB — delete from each console.
+```
+
+**Free the host:**
+
+- **Cloudflared service** (if installed): `cloudflared service uninstall` (Linux/macOS) or use the Windows installer.
+- **Caddy + TLS certificates** (Oracle path 5): `sudo systemctl stop caddy && sudo apt remove caddy`. Issued certs live under `/var/lib/caddy/.local/share/caddy/`.
+- **Oracle VM:** terminate the instance from the Oracle Cloud console; the boot volume goes with it (Always Free → no charge).
+
+| Volume | Holds | Wiped by `down -v`? |
+|---|---|---|
+| `qdrant_data` | All ingested chunks + embeddings | yes |
+| `redis_data` | Embedding cache + Celery queue | yes |
+| `huggingface_cache` | Embedding/reranker models (~3 GB) | yes (re-downloads next start) |
+| `prometheus_data`, `grafana_data` | Metrics + dashboards | yes |
 
 ---
 
@@ -270,4 +332,4 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile produc
 | Ingest very slow | Expected on CPU; use small PDFs for demo |
 | `ready` never true | First model download; wait or check disk space |
 
-See also [`README.md`](../README.md) section **8b. DocuMind Web**.
+See also the **Quickstart** section in [`../README.md`](../README.md) — the same `docker compose --profile production up -d --build` command is used for local, Cloudflare Tunnel, and VM deployments.

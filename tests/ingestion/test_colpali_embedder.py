@@ -9,7 +9,7 @@ import torch
 from backend.ingestion.embeddings.colpali_embedder import _pool_multi_vector
 from backend.ingestion.embeddings.multimodal_embed import embed_chunks
 from backend.core.models import ChunkType, EmbeddedChunk
-from tests.ingestion.conftest import make_chunk
+from tests._factories import make_chunk
 
 
 def test_pool_multi_vector_mean_pools_and_normalises():

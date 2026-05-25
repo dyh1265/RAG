@@ -1,4 +1,4 @@
-"""Phase 6 production FastAPI service."""
+"""DocuMind production FastAPI service."""
 
 from __future__ import annotations
 
@@ -49,8 +49,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(
-    title="Advanced RAG API",
-    description="Production multimodal RAG service (Phase 6)",
+    title="DocuMind API",
+    description="Multimodal RAG service: PDF ingest, hybrid retrieval, cited answers.",
     version="0.1.0",
     lifespan=lifespan,
 )

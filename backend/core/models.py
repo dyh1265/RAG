@@ -56,7 +56,7 @@ class BoundingBox(BaseModel):
 class DocumentChunk(BaseModel):
     """
     A single unit of content extracted from a source document.
-    Produced by parsers (Phase 1) and consumed by embedders, retrievers, and evaluators.
+    Produced by parsers and consumed by embedders, retrievers, and evaluators.
     """
     id: str = Field(default_factory=lambda: str(uuid4()))
     doc_id: str                          # Stable ID for the parent document
@@ -71,7 +71,7 @@ class DocumentChunk(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    # Set by contextual enrichment (Phase 2)
+    # Set by contextual enrichment (retrieval pipeline)
     context_prefix: str | None = None   # Prepended doc/section summary
 
     @property
@@ -136,7 +136,7 @@ class QueryResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Evaluation models (Phase 5)
+# Evaluation models
 # ---------------------------------------------------------------------------
 
 class EvalSample(BaseModel):
@@ -151,7 +151,7 @@ class EvalSample(BaseModel):
     top_k: int = 5
     chunk_type_focus: ChunkType | None = None  # e.g. FIGURE for visual QA samples
     tags: list[str] = Field(default_factory=list)
-    expect_conformity_flagged: bool | None = None  # Phase 4 taxonomy eval
+    expect_conformity_flagged: bool | None = None  # taxonomy conformity eval
 
 
 class MetricScore(BaseModel):

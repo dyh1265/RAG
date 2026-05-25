@@ -1,1 +1,1 @@
-"""Phase 3 — scalable ingestion (Celery workers, Redis cache, metrics)."""
+"""Scalable ingestion: Celery workers, Redis cache, dedup, fingerprinting, metrics."""

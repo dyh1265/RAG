@@ -19,13 +19,13 @@ from backend.core.models import ChunkType, QueryRequest, RetrievalStrategy, Retr
 from backend.ingestion.embeddings.colpali_embedder import ColPaliEmbedder
 from backend.ingestion.embeddings.image_embedder import ImageEmbedder
 from backend.ingestion.embeddings.text_embedder import TextEmbedder
-from backend.ingestion.retrieval.chunk_filters import (
+from backend.ingestion.stores.qdrant_store import COLLECTION_MAP, QdrantStore
+from backend.retrieval.chunk_filters import (
     is_substantive_content,
     prefer_substantive_contexts,
 )
-from backend.ingestion.retrieval.reranker import CrossEncoderReranker
-from backend.ingestion.stores.qdrant_store import COLLECTION_MAP, QdrantStore
-from backend.retrieval.retrieval.parent_expand import collect_parent_ids, expand_to_parents
+from backend.retrieval.cross_encoder_reranker import CrossEncoderReranker
+from backend.retrieval.parent_expand import collect_parent_ids, expand_to_parents
 
 FIGURE_HINTS = ("figure", "chart", "graph", "diagram", "plot", "visual", "trend")
 TABLE_HINTS = ("table", "margin", "quarter", "row", "column", "operating")
@@ -206,7 +206,7 @@ class MultiModalRetriever:
             corpus = corpus + page_corpus
         if not corpus:
             return None
-        from backend.retrieval.retrieval.hybrid_retriever import HybridRetriever
+        from backend.retrieval.hybrid_retriever import HybridRetriever
 
         hybrid = HybridRetriever(
             corpus,

@@ -25,7 +25,9 @@ def load_taxonomy(path: Path | None = None) -> Taxonomy:
         from rdflib import Graph, Namespace
         from rdflib.namespace import RDF, RDFS
     except ImportError as exc:
-        raise ImportError("Install rdflib: pip install -e '.[phase4]'") from exc
+        raise ImportError(
+            "rdflib not installed; run `pip install -e .` from the repo root."
+        ) from exc
 
     settings = get_settings()
     ttl_path = path or Path(settings.taxonomies_dir) / "classification.ttl"

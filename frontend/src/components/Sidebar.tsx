@@ -123,7 +123,7 @@ export function Sidebar({
 
       {!demoUi && (
         <footer className="sidebar-footer">
-          <p>Phase 6 API · PII redaction on queries</p>
+          <p>PII redaction on queries</p>
         </footer>
       )}
     </aside>

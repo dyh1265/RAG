@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from backend.ingestion.retrieval.chunk_filters import (
+from backend.retrieval.chunk_filters import (
     is_substantive_content,
     prefer_substantive_contexts,
 )
 from backend.core.models import ChunkType
-from tests.ingestion.conftest import make_context
+from tests._factories import make_context
 
 
 def test_is_substantive_content_rejects_image_stub():

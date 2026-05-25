@@ -34,7 +34,9 @@ def _engines():
         from presidio_analyzer import AnalyzerEngine
         from presidio_anonymizer import AnonymizerEngine
     except ImportError as exc:
-        raise ImportError("Install phase6 deps: pip install -e '.[phase6]'") from exc
+        raise ImportError(
+            "presidio not installed; run `pip install -e .` from the repo root."
+        ) from exc
 
     return AnalyzerEngine(), AnonymizerEngine()
 

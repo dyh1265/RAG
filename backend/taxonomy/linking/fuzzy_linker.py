@@ -45,7 +45,9 @@ def link_terms(terms: list[str], taxonomy: Taxonomy, *, threshold: float = 85.0)
     try:
         from rapidfuzz import fuzz, process
     except ImportError as exc:
-        raise ImportError("Install rapidfuzz: pip install -e '.[phase4]'") from exc
+        raise ImportError(
+            "rapidfuzz not installed; run `pip install -e .` from the repo root."
+        ) from exc
 
     candidates = taxonomy.allowed_labels + taxonomy.forbidden_labels
     linked: list[LinkedTerm] = []

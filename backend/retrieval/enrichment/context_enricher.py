@@ -1,4 +1,4 @@
-"""Contextual prefix enrichment before embedding (Phase 2)."""
+"""Contextual prefix enrichment before embedding."""
 
 from __future__ import annotations
 

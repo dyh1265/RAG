@@ -37,7 +37,7 @@ class SemanticChunker(BaseChunker):
     """
     Split documents at semantic boundaries using sentence embeddings.
 
-    Install: sentence-transformers (already required for Phase 1)
+    Install: sentence-transformers (already a core ingestion dependency).
     """
 
     def __init__(

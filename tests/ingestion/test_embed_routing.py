@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 from backend.ingestion.embeddings.multimodal_embed import embed_chunks
 from backend.core.models import ChunkType, EmbeddedChunk
-from tests.ingestion.conftest import make_chunk
+from tests._factories import make_chunk
 
 
 def test_embed_chunks_routes_by_type():

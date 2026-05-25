@@ -10,7 +10,7 @@ from tests.eval.metrics import (
     mrr,
     recall_at_k,
 )
-from tests.ingestion.conftest import make_context
+from tests._factories import make_context
 
 
 def _contexts(pages: list[int | None]) -> list:

@@ -1,4 +1,4 @@
-"""Phase 6 production API tests."""
+"""Production API tests."""
 
 from __future__ import annotations
 

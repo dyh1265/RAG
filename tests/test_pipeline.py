@@ -7,7 +7,19 @@ from unittest.mock import MagicMock, patch
 
 from backend.core.models import ChunkType, QueryRequest
 from backend.core.pipeline import PipelineConfig, RAGPipeline
-from tests.ingestion.conftest import make_chunk, make_context
+from tests._factories import make_chunk, make_context
+
+
+def _ingest_only_config() -> PipelineConfig:
+    """Minimal config that skips PDF-touching enrichment in unit tests."""
+    return PipelineConfig(
+        use_section_paths=False,
+        use_recursive_chunker=False,
+        use_semantic_chunker=False,
+        use_context_enrichment=False,
+        use_parent_expand=False,
+        use_taxonomy_validation=False,
+    )
 
 
 def test_ingest_parses_embeds_and_upserts():
@@ -15,7 +27,7 @@ def test_ingest_parses_embeds_and_upserts():
     store = MagicMock()
     embedded = MagicMock(chunk=chunk, vector=[0.1], model_name="bge-m3")
 
-    pipeline = RAGPipeline(store=store)
+    pipeline = RAGPipeline(_ingest_only_config(), store=store)
     pipeline._ingestion = MagicMock()
     pipeline._ingestion.parse_safe.return_value = ([chunk], [])
 
@@ -45,7 +57,8 @@ def test_query_retrieve_only_skips_llm():
 
 
 def test_query_generates_answer():
-    pipeline = RAGPipeline(PipelineConfig(llm_provider="openai"), store=MagicMock())
+    config = PipelineConfig(llm_provider="openai", use_taxonomy_validation=False)
+    pipeline = RAGPipeline(config, store=MagicMock())
     pipeline._retriever = MagicMock()
     pipeline._retriever.retrieve.return_value = [make_context(chunk_id="c1")]
 

@@ -9,10 +9,24 @@ from pathlib import Path
 from backend.core.models import DocumentChunk
 
 
+# Bytes sampled from the head of the file for fingerprinting.
+# Big enough to detect content edits, small enough to keep ingest skip checks O(ms).
+_DOC_FINGERPRINT_HEAD_BYTES = 64 * 1024
+
+
 def doc_fingerprint(path: Path) -> str:
-    """Stable fingerprint from file size + mtime (fast change detection)."""
+    """
+    Stable fingerprint for fast change detection.
+
+    Combines size + mtime + a hash of the first ~64 KB of content. The content
+    sample makes the fingerprint robust to filesystems where size and mtime can
+    collide for distinct writes (NTFS sub-tick mtime, etc.).
+    """
     stat = path.stat()
-    payload = f"{path.name}:{stat.st_size}:{stat.st_mtime_ns}"
+    head_hash = hashlib.sha256()
+    with path.open("rb") as fh:
+        head_hash.update(fh.read(_DOC_FINGERPRINT_HEAD_BYTES))
+    payload = f"{path.name}:{stat.st_size}:{stat.st_mtime_ns}:{head_hash.hexdigest()}"
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 

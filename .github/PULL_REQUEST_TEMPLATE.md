@@ -8,9 +8,9 @@
 
 -
 
-## Phase / area
+## Module / area
 
-<!-- e.g. phase1 ingestion, phase2 retrieval, docker, frontend, docs -->
+<!-- e.g. backend.ingestion, backend.retrieval, backend.api, docker, frontend, docs -->
 
 ## How was this tested?
 
@@ -19,7 +19,7 @@
 - [ ] `pytest tests/ -m "not integration" -v` passes locally
 - [ ] `ruff check .` passes
 - [ ] Updated/added tests for behavior changes
-- [ ] Updated phase README if a public interface changed
+- [ ] Updated relevant docs if a public interface changed
 
 ## Screenshots / output (optional)
 

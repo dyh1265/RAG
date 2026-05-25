@@ -1,5 +1,5 @@
 """
-Generate data/raw/sample_report.pdf for Phase 1 demo testing.
+Generate data/raw/sample_report.pdf for ingestion / quickstart demos.
 
 Usage:
     python scripts/generate_sample_report.py

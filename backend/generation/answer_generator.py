@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import httpx
 
-from backend.ingestion.retrieval.chunk_filters import is_substantive_content
+from backend.retrieval.chunk_filters import is_substantive_content
 from backend.core.config import get_settings
 from backend.core.models import Citation, QueryResponse, RetrievedContext
 

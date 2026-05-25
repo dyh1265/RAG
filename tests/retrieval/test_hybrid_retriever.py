@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from backend.retrieval.retrieval.hybrid_retriever import HybridRetriever, reciprocal_rank_fusion
+from backend.retrieval.hybrid_retriever import HybridRetriever, reciprocal_rank_fusion
 from backend.core.models import ChunkType, DocumentChunk, DocumentType, QueryRequest, RetrievalStrategy
-from tests.ingestion.conftest import make_context
+from tests._factories import make_context
 
 
 def test_hybrid_retriever_fuses_sparse_and_dense():
@@ -57,7 +57,7 @@ def test_reciprocal_rank_fusion_prefers_top_of_both_lists():
 
 
 def test_boost_section_chunks_promotes_objectives_page():
-    from backend.retrieval.retrieval.hybrid_retriever import _boost_section_chunks
+    from backend.retrieval.hybrid_retriever import _boost_section_chunks
 
     page = make_context(
         chunk_id="page",
@@ -78,7 +78,7 @@ def test_boost_section_chunks_promotes_objectives_page():
 
 
 def test_boost_section_chunks_promotes_bullet_page():
-    from backend.retrieval.retrieval.hybrid_retriever import _boost_section_chunks
+    from backend.retrieval.hybrid_retriever import _boost_section_chunks
 
     page = make_context(
         chunk_id="page",

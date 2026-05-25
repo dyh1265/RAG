@@ -1,13 +1,13 @@
 """
 Hybrid retriever: BM25 (sparse) + dense vector search, fused with Reciprocal Rank Fusion.
 
-This is the recommended baseline retriever for Phase 2.
-RRF is parameter-free and consistently outperforms naive score averaging.
+This is the recommended baseline retriever. RRF is parameter-free and
+consistently outperforms naive score averaging.
 """
 
 from __future__ import annotations
 
-from backend.ingestion.retrieval.chunk_filters import is_substantive_content
+from backend.retrieval.chunk_filters import is_substantive_content
 from backend.core.models import ChunkType, DocumentChunk, QueryRequest, RetrievalStrategy, RetrievedContext
 
 # doc_id -> (corpus_size, BM25Okapi index)

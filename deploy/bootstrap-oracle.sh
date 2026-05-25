@@ -7,7 +7,6 @@
 set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-$HOME/RAG}"
-COMPOSE_FILES="-f docker-compose.yml -f docker-compose.demo.yml"
 PROFILE="--profile production"
 
 log() { printf '==> %s\n' "$*"; }
@@ -53,9 +52,9 @@ if ! grep -q '^OPENAI_API_KEY=sk-' .env 2>/dev/null; then
   log "WARNING: Set OPENAI_API_KEY in $REPO_DIR/.env"
 fi
 
-log "Building and starting demo stack (first run can take 15–30 min)..."
+log "Building and starting demo stack (first run can take 15-30 min)..."
 cd docker
-docker compose $COMPOSE_FILES $PROFILE up -d --build qdrant redis rag-api documind-web
+docker compose $PROFILE up -d --build qdrant redis rag-api ingest-worker documind-web
 
 log "Waiting for API readiness..."
 for i in $(seq 1 60); do

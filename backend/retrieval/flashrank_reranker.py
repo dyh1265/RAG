@@ -1,4 +1,4 @@
-"""FlashRank reranker — lightweight cross-encoder alternative for Phase 2."""
+"""FlashRank reranker — lightweight cross-encoder alternative."""
 
 from __future__ import annotations
 

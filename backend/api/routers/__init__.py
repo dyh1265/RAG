@@ -1,1 +1,1 @@
-"""Phase 6 API router package."""
+"""DocuMind API router package."""

@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.ingestion.generation.answer_generator import AnswerGenerator
-from tests.ingestion.conftest import make_context
+from backend.generation.answer_generator import AnswerGenerator
+from tests._factories import make_context
 
 
 def test_generate_without_contexts():
@@ -23,8 +23,22 @@ def test_generate_openai_calls_api_and_builds_citations():
     generator.api_key = "sk-test-key"
 
     contexts = [
-        make_context(chunk_id="c1", content="Revenue was $58.3M in Q1 2025.", rank=1),
-        make_context(chunk_id="c2", content="Operating margin improved.", rank=2),
+        make_context(
+            chunk_id="c1",
+            content=(
+                "Revenue was $58.3M in Q1 2025, up from $54.6M in Q4 2024. "
+                "Operating margin reached 23.1%."
+            ),
+            rank=1,
+        ),
+        make_context(
+            chunk_id="c2",
+            content=(
+                "Operating margin improved each quarter as infrastructure costs "
+                "were amortised over a larger customer base."
+            ),
+            rank=2,
+        ),
     ]
 
     mock_response = MagicMock()
@@ -33,7 +47,7 @@ def test_generate_openai_calls_api_and_builds_citations():
         "choices": [{"message": {"content": "Revenue reached $58.3M in Q1 2025 [1]."}}]
     }
 
-    with patch("backend.ingestion.generation.answer_generator.httpx.Client") as client_cls:
+    with patch("backend.generation.answer_generator.httpx.Client") as client_cls:
         client = MagicMock()
         client.__enter__ = MagicMock(return_value=client)
         client.__exit__ = MagicMock(return_value=False)
@@ -55,5 +69,12 @@ def test_generate_openai_requires_api_key():
     generator = AnswerGenerator(provider="openai")
     generator.api_key = ""
 
+    substantive = make_context(
+        content=(
+            "Revenue was $58.3M in Q1 2025, up from $54.6M in Q4 2024. "
+            "Operating margin reached 23.1%."
+        ),
+    )
+
     with pytest.raises(ValueError, match="OPENAI_API_KEY"):
-        generator.generate("Q?", [make_context()])
+        generator.generate("Q?", [substantive])

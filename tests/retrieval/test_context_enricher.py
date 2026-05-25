@@ -1,4 +1,4 @@
-"""Tests for Phase 2 context enrichment."""
+"""Tests for retrieval-time context enrichment."""
 
 from __future__ import annotations
 

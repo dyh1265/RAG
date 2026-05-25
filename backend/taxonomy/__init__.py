@@ -1,1 +1,1 @@
-"""Phase 4 — taxonomy validation against RDF/OWL ontologies."""
+"""Taxonomy validation against RDF/OWL ontologies."""
