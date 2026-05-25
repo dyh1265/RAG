@@ -8,6 +8,9 @@ from backend.core.models import RetrievedContext
 def is_substantive_content(content: str, *, min_len: int = 40) -> bool:
     """True when chunk text is useful for LLM grounding (not a page/figure stub)."""
     text = content.strip()
+    # Pipe-separated table rows are valid grounding even when short overall.
+    if " | " in text and len(text) >= 20:
+        return True
     if len(text) < min_len:
         return False
     lowered = text.lower()
