@@ -39,10 +39,6 @@ desktop.ini
 *.log
 cloudflared.log
 
-# --- Notebooks ---
-notebooks/.ipynb_checkpoints/
-notebooks/data/
-
 # --- Data artifacts ---
 # Track sample PDFs; ignore everything else
 data/raw/*
@@ -51,10 +47,9 @@ data/raw/*
 !data/raw/long_report.pdf
 data/processed/
 
-# --- Phase 5 evaluation outputs ---
-phases/phase_05_evaluation/reports/
-phases/phase_05_evaluation/baselines/
-
 # --- Frontend (also covered by frontend/.gitignore) ---
 frontend/node_modules/
 frontend/dist/
+
+# --- Internal task notes ---
+tasks/

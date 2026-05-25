@@ -1,1 +1,0 @@
-"""DocuMind capstone package."""

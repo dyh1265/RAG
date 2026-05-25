@@ -5,7 +5,7 @@ Run: pytest tests/test_models.py
 
 from __future__ import annotations
 
-from shared.models import (
+from backend.core.models import (
     ChunkType,
     DocumentChunk,
     DocumentType,

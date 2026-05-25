@@ -24,11 +24,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install package
+      - name: Install backend
         run: |
           python -m pip install --upgrade pip
-          # Phase 1+2 cover everything tested under `pytest -m "not integration"`
-          pip install -e ".[phase1,phase2]"
+          pip install -e ".[dev]"
 
       - name: Run unit tests
         run: pytest tests/ -m "not integration" -v

@@ -103,10 +103,10 @@ cd docker
 docker compose -f docker-compose.yml -f docker-compose.demo.yml --profile production up -d --build
 ```
 
-Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/), then:
+Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/), then run from a new terminal:
 
-```powershell
-cloudflared tunnel --url http://localhost:80
+```
+"C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --url http://localhost:80
 ```
 
 Cloudflare prints a public `https://….trycloudflare.com` URL. Share that link.

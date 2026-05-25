@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from shared.data_browser import browse_directory
+from backend.core.data_browser import browse_directory
 
 
 def test_browse_lists_dirs_and_pdfs(tmp_path: Path, monkeypatch):

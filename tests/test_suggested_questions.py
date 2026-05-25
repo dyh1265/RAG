@@ -1,7 +1,7 @@
 """Tests for document-specific starter question generation."""
 
-from shared.models import ChunkType, DocumentChunk, DocumentType
-from shared.suggested_questions import build_suggested_questions, doc_title_from_name
+from backend.core.models import ChunkType, DocumentChunk, DocumentType
+from backend.core.suggested_questions import build_suggested_questions, doc_title_from_name
 
 
 def _chunk(

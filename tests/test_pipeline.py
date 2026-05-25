@@ -1,13 +1,13 @@
-"""Tests for shared.pipeline.RAGPipeline."""
+"""Tests for backend.core.pipeline.RAGPipeline."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
 
-from shared.models import ChunkType, QueryRequest
-from shared.pipeline import PipelineConfig, RAGPipeline
-from tests.phase1.conftest import make_chunk, make_context
+from backend.core.models import ChunkType, QueryRequest
+from backend.core.pipeline import PipelineConfig, RAGPipeline
+from tests.ingestion.conftest import make_chunk, make_context
 
 
 def test_ingest_parses_embeds_and_upserts():
@@ -19,7 +19,7 @@ def test_ingest_parses_embeds_and_upserts():
     pipeline._ingestion = MagicMock()
     pipeline._ingestion.parse_safe.return_value = ([chunk], [])
 
-    with patch("shared.pipeline.embed_chunks", return_value=[embedded]):
+    with patch("backend.core.pipeline.embed_chunks", return_value=[embedded]):
         result = pipeline.ingest("/data/report.pdf")
 
     store.delete_doc.assert_called_once()
@@ -57,7 +57,7 @@ def test_query_generates_answer():
     mock_response.model_used = "openai:gpt-4o-mini"
     mock_response.latency_ms = 10.0
 
-    with patch("shared.pipeline.AnswerGenerator") as gen_cls:
+    with patch("backend.core.pipeline.AnswerGenerator") as gen_cls:
         gen_cls.return_value.generate.return_value = mock_response
         response = pipeline.query(QueryRequest(query="Q?"))
 

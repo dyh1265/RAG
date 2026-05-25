@@ -1,18 +1,20 @@
-# Start everything: docker compose up -d
-# Start just the basics (Phase 1-2): docker compose up -d qdrant redis
+# Start the full stack:                       docker compose --profile production up -d
+# Start just the vector + cache services:     docker compose up -d qdrant redis
+# Start observability too:                    docker compose up -d prometheus grafana jaeger
+# Run a Celery worker for bulk ingest:        docker compose --profile production up -d ingest-worker
 
 services:
 
   # ---------------------------------------------------------------------------
-  # Vector DB — primary store for all chunk embeddings (Phases 1-6)
+  # Vector DB — primary store for all chunk embeddings.
   # UI: http://localhost:6333/dashboard
   # ---------------------------------------------------------------------------
   qdrant:
     image: qdrant/qdrant:v1.12.5
     container_name: rag_qdrant
     ports:
-      - "6333:6333"   # HTTP REST + dashboard
-      - "6334:6334"   # gRPC
+      - "6333:6333"
+      - "6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
     environment:
@@ -20,7 +22,7 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # Redis — embedding cache (Phase 3) + Celery task queue (Phase 3+)
+  # Redis — embedding cache + Celery task queue.
   # ---------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
@@ -33,8 +35,7 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # Prometheus — metrics scraping (Phase 3+)
-  # UI: http://localhost:9090
+  # Prometheus — metrics scraping. UI: http://localhost:9090
   # ---------------------------------------------------------------------------
   prometheus:
     image: prom/prometheus:v2.51.0
@@ -50,8 +51,7 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # Grafana — dashboards for ingestion throughput, latency, costs (Phase 3+)
-  # UI: http://localhost:3000  (admin / admin)
+  # Grafana — dashboards. UI: http://localhost:3000  (admin / admin)
   # ---------------------------------------------------------------------------
   grafana:
     image: grafana/grafana:10.4.2
@@ -69,22 +69,21 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # Jaeger — distributed tracing (Phase 6)
-  # UI: http://localhost:16686
+  # Jaeger — distributed tracing. UI: http://localhost:16686
   # ---------------------------------------------------------------------------
   jaeger:
     image: jaegertracing/all-in-one:1.57
     container_name: rag_jaeger
     ports:
-      - "16686:16686"   # Jaeger UI
-      - "4317:4317"     # OTLP gRPC receiver
-      - "4318:4318"     # OTLP HTTP receiver
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # Nginx — reverse proxy + rate limiting for the production API (Phase 6)
+  # Nginx — reverse proxy + rate limiting in front of the API.
   # ---------------------------------------------------------------------------
   nginx:
     image: nginx:1.25-alpine
@@ -95,13 +94,13 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - rag-api
+      - documind-web
     profiles:
-      - production   # only starts with: docker compose --profile production up
+      - production
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # RAG API — the Phase 6 FastAPI service
-  # Only starts with the production profile: docker compose --profile production up
+  # Backend — FastAPI service (backend.api.main:app)
   # ---------------------------------------------------------------------------
   rag-api:
     build:
@@ -109,14 +108,13 @@ services:
       dockerfile: docker/Dockerfile
     container_name: rag_api
     ports:
-      - "8002:8000"   # host 8002 — change if 8000 is free on your machine
+      - "8002:8000"
     env_file:
       - ../.env
     environment:
       QDRANT_URL: http://qdrant:6333
       REDIS_URL: redis://redis:6379/0
       OTLP_ENDPOINT: http://jaeger:4317
-      OLLAMA_BASE_URL: http://ollama:11434
       USE_COLPALI: "false"
       USE_HYBRID: "true"
       USE_RECURSIVE_CHUNKER: "true"
@@ -128,10 +126,7 @@ services:
       USE_OCR: "true"
     volumes:
       - ../data:/app/data
-      - ../shared:/app/shared
-      - ../documind:/app/documind
-      - ../phases:/app/phases
-      - ../capstone:/app/capstone
+      - ../backend:/app/backend
     depends_on:
       qdrant:
         condition: service_started
@@ -142,9 +137,44 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # DocuMind Web — React frontend (Node.js / Vite)
-  # Dev UI: http://localhost:5173  (documind-web-dev)
-  # Prod UI: http://localhost:5174  (documind-web, nginx)
+  # Celery bulk-ingest worker — reuses the same backend image as rag-api.
+  # ---------------------------------------------------------------------------
+  ingest-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: rag-api-backend:latest
+    container_name: rag_ingest_worker
+    env_file:
+      - ../.env
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      EMBEDDING_DEVICE: cpu
+      USE_COLPALI: "false"
+      USE_HYBRID: "true"
+      USE_RECURSIVE_CHUNKER: "true"
+      USE_OCR: "true"
+      INGEST_METRICS_PORT: "9100"
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
+    ports:
+      - "9100:9100"
+    volumes:
+      - ../data:/app/data
+      - ../backend:/app/backend
+    command: ["celery", "-A", "backend.scaling.workers.celery_app", "worker", "--loglevel=info", "--concurrency=1"]
+    depends_on:
+      qdrant:
+        condition: service_started
+      redis:
+        condition: service_started
+    profiles:
+      - production
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Frontend (React + Vite). Dev: http://localhost:5173 / Prod: http://localhost:5174
   # ---------------------------------------------------------------------------
   documind-web-dev:
     build:
@@ -180,165 +210,6 @@ services:
       - production
     restart: unless-stopped
 
-  # ---------------------------------------------------------------------------
-  # Ollama — local LLM for answer generation (Phase 1 demo)
-  # API: http://localhost:11434
-  # Pull a model once: docker compose exec ollama ollama pull llama3.2
-  # ---------------------------------------------------------------------------
-  ollama:
-    image: ollama/ollama:latest
-    container_name: rag_ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    profiles:
-      - phase1
-      - phase1-gpu
-    restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
-  # Phase 1 GPU demo — ColPali page embeddings (NGC PyTorch base, NVIDIA GPU)
-  # Base image: nvcr.io/nvidia/pytorch:25.02-py3 (torch 2.7; 24.12 incompatible with transformers 5.x)
-  # Run:
-  #   docker compose --profile phase1-gpu up -d qdrant
-  #   docker compose --profile phase1-gpu build phase1-demo-gpu
-  #   docker compose --profile phase1-gpu run --rm phase1-demo-gpu \
-  #     --doc data/raw/sample_report.pdf \
-  #     --query "What does Figure 3 show about revenue trends?" \
-  #     --provider openai
-  # ---------------------------------------------------------------------------
-  phase1-demo-gpu:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.phase1.gpu
-    image: advanced-rag-phase1-gpu:ngc
-    env_file:
-      - ../.env
-    environment:
-      QDRANT_URL: http://qdrant:6333
-      OLLAMA_BASE_URL: http://ollama:11434
-      EMBEDDING_DEVICE: cuda
-      USE_COLPALI: "true"
-    volumes:
-      - ../data:/app/data
-      - ../shared:/app/shared
-      - ../phases:/app/phases
-      - huggingface_cache:/root/.cache/huggingface
-    depends_on:
-      qdrant:
-        condition: service_started
-    gpus: all
-    profiles:
-      - phase1-gpu
-
-  # Long-running GPU shell — keeps models warm between queries (avoid cold-start per run).
-  #   docker compose --profile phase1-gpu up -d qdrant phase1-gpu-shell
-  #   docker compose exec phase1-gpu-shell python phases/phase_01_multimodal_ingestion/demo.py \
-  #     --doc data/raw/sample_report.pdf --query "..." --provider openai --skip-ingest --skip-preload
-  # ---------------------------------------------------------------------------
-  phase1-gpu-shell:
-    image: advanced-rag-phase1-gpu:ngc
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.phase1.gpu
-    env_file:
-      - ../.env
-    environment:
-      QDRANT_URL: http://qdrant:6333
-      OLLAMA_BASE_URL: http://ollama:11434
-      EMBEDDING_DEVICE: cuda
-      USE_COLPALI: "true"
-      REDIS_URL: redis://redis:6379/0
-    volumes:
-      - ../data:/app/data
-      - ../shared:/app/shared
-      - ../scripts:/app/scripts
-      - ../phases:/app/phases
-      - ../capstone:/app/capstone
-      - huggingface_cache:/root/.cache/huggingface
-    depends_on:
-      qdrant:
-        condition: service_started
-      redis:
-        condition: service_started
-    gpus: all
-    entrypoint: []
-    command: ["sleep", "infinity"]
-    profiles:
-      - phase1-gpu
-
-  # ---------------------------------------------------------------------------
-  # Phase 1 demo (CPU) — one-shot ingest + query (does not auto-start on `up`)
-  # Run:
-  #   docker compose --profile phase1 up -d qdrant ollama
-  #   docker compose exec ollama ollama pull llama3.2
-  #   docker compose --profile phase1 run --rm phase1-demo \
-  #     --doc data/raw/sample_report.pdf \
-  #     --query "What does Figure 3 show about revenue trends?" \
-  #     --provider ollama
-  # ---------------------------------------------------------------------------
-  phase1-demo:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.phase1
-    env_file:
-      - ../.env
-    environment:
-      QDRANT_URL: http://qdrant:6333
-      OLLAMA_BASE_URL: http://ollama:11434
-    volumes:
-      - ../data:/app/data
-      - ../shared:/app/shared
-      - ../phases:/app/phases
-      - huggingface_cache:/root/.cache/huggingface
-    depends_on:
-      qdrant:
-        condition: service_started
-    profiles:
-      - phase1
-
-  # ---------------------------------------------------------------------------
-  # Phase 3 ingest worker — Celery + Redis cache + Prometheus metrics
-  #   docker compose --profile phase3 up -d qdrant redis ingest-worker
-  #   docker compose exec ingest-worker celery -A phases.phase_03_scalable_ingestion.workers.celery_app inspect ping
-  # ---------------------------------------------------------------------------
-  ingest-worker:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.phase3
-    container_name: rag_ingest_worker
-    env_file:
-      - ../.env
-    environment:
-      QDRANT_URL: http://qdrant:6333
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      EMBEDDING_DEVICE: cpu
-      USE_COLPALI: "false"
-      USE_HYBRID: "true"
-      USE_RECURSIVE_CHUNKER: "true"
-      USE_OCR: "true"
-      INGEST_METRICS_PORT: "9100"
-      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
-    ports:
-      - "9100:9100"
-    volumes:
-      - ../data:/app/data
-      - ../shared:/app/shared
-      - ../scripts:/app/scripts
-      - ../phases:/app/phases
-      - huggingface_cache:/root/.cache/huggingface
-    depends_on:
-      qdrant:
-        condition: service_started
-      redis:
-        condition: service_started
-    profiles:
-      - phase3
-      - production
-    restart: unless-stopped
-
 
 volumes:
   qdrant_data:
@@ -346,5 +217,4 @@ volumes:
   prometheus_data:
   grafana_data:
   huggingface_cache:
-  ollama_data:
   documind_node_modules:

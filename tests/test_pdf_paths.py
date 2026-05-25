@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from shared.pdf_paths import collect_pdf_paths, resolve_under_base
+from backend.core.pdf_paths import collect_pdf_paths, resolve_under_base
 
 
 def test_collect_pdf_paths_from_directory(tmp_path: Path):

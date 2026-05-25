@@ -1,4 +1,4 @@
-# Production RAG API — FastAPI + pipeline + Phase 4 taxonomy + guardrails.
+# Production RAG API — FastAPI + multimodal pipeline + taxonomy + guardrails.
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -50,12 +50,9 @@ RUN apt-get update \
         "Pillow>=10.0" \
     && python -m spacy download en_core_web_sm
 
-COPY shared/ shared/
-COPY documind/ documind/
-COPY phases/ phases/
-COPY capstone/ capstone/
+COPY backend/ backend/
 COPY data/taxonomies/ data/taxonomies/
 
 EXPOSE 8000
 
-CMD ["uvicorn", "phases.phase_06_production.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

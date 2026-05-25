@@ -1,6 +1,4 @@
-"""
-Shared pytest fixtures for all phases.
-"""
+"""Shared pytest fixtures."""
 
 from __future__ import annotations
 
@@ -9,10 +7,7 @@ from uuid import uuid4
 
 import pytest
 
-from phases._legacy import install_legacy_imports
-from shared.models import ChunkType, DocumentChunk, DocumentType
-
-install_legacy_imports()
+from backend.core.models import ChunkType, DocumentChunk, DocumentType
 
 
 @pytest.fixture

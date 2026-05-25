@@ -1,0 +1,74 @@
+"""Phase 6 production FastAPI service."""
+
+from __future__ import annotations
+
+import asyncio
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+from backend.api.rate_limit import limiter
+from backend.api.routers import admin, bulk_ingest, health, ingest, query
+from backend.api.monitoring.tracing import setup_tracing
+from backend.core.config import get_settings
+from backend.core.pipeline import PipelineConfig, RAGPipeline
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    settings = get_settings()
+    config = PipelineConfig(
+        use_colpali=settings.use_colpali,
+        use_hybrid=settings.use_hybrid,
+        use_recursive_chunker=settings.use_recursive_chunker,
+        use_semantic_chunker=settings.use_semantic_chunker,
+        use_section_paths=settings.use_section_paths,
+        use_context_enrichment=settings.use_context_enrichment,
+        use_parent_expand=settings.use_parent_expand,
+        use_flashrank=settings.use_flashrank,
+        use_taxonomy_validation=settings.use_taxonomy_validation,
+        block_forbidden_classifications=settings.taxonomy_block_forbidden,
+    )
+    app.state.pipeline = RAGPipeline(config)
+    print(f"[startup] RAG API on {settings.api_host}:{settings.api_port}")
+
+    if settings.api_warmup_models:
+        async def _warmup() -> None:
+            ms = await asyncio.to_thread(app.state.pipeline.preload_models)
+            print(f"[startup] models preloaded in {ms:.0f}ms")
+
+        asyncio.create_task(_warmup())
+
+    yield
+    print("[shutdown] RAG API shutting down.")
+
+
+app = FastAPI(
+    title="Advanced RAG API",
+    description="Production multimodal RAG service (Phase 6)",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+setup_tracing(app, get_settings())
+
+app.include_router(health.router, tags=["Health"])
+app.include_router(query.router, prefix="/query", tags=["Query"])
+app.include_router(ingest.router, prefix="/ingest", tags=["Ingest"])
+app.include_router(bulk_ingest.router, prefix="/ingest", tags=["Ingest"])
+app.include_router(admin.router, prefix="/admin", tags=["Admin"])
