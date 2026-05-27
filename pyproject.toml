@@ -89,6 +89,10 @@ dev = [
     "pytest-asyncio>=0.23",
     "ruff>=0.6",
     "locust>=2.28",
+    # matplotlib is only used by scripts/generate_sample_report.py (lazy-imported
+    # inside _chart_png). Declared here so CI runners can regenerate the sample
+    # PDF without pulling matplotlib into the production runtime image.
+    "matplotlib>=3.8",
 ]
 eval = [
     "ragas>=0.2.10",
