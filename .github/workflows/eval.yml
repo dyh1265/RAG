@@ -4,6 +4,14 @@ on:
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - "backend/retrieval/**"
+      - "backend/ingestion/**"
+      - "backend/core/pipeline.py"
+      - "tests/eval/**"
+      - ".github/workflows/eval.yml"
 
 jobs:
   retrieval-eval:
@@ -45,6 +53,22 @@ jobs:
           USE_TAXONOMY_VALIDATION: "false"
           USE_PII_REDACTION: "false"
         run: pytest tests/eval/test_retrieval.py tests/eval/test_metrics.py -m eval -v
+
+      - name: Publish benchmark summary
+        if: always()
+        env:
+          QDRANT_URL: http://localhost:6333
+          USE_TAXONOMY_VALIDATION: "false"
+          USE_PII_REDACTION: "false"
+        run: python scripts/run_eval_report.py -o benchmarks.md
+
+      - name: Upload benchmark report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrieval-benchmarks
+          path: benchmarks.md
+          if-no-files-found: ignore
 
   answer-eval:
     name: Answer quality (OpenAI)

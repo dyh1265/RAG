@@ -120,3 +120,4 @@ extend-exclude = [".venv", "venv", "build", "dist"]
 
 [tool.ruff.lint.per-file-ignores]
 "backend/api/load/locustfile.py" = ["E402"]
+"scripts/run_eval_report.py" = ["E402"]

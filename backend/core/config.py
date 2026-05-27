@@ -97,9 +97,27 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     api_rate_limit_per_minute: int = 60
+    cors_allow_origins: str = Field(
+        default="*",
+        alias="CORS_ALLOW_ORIGINS",
+        description=(
+            "Comma-separated allowed origins for browser CORS. "
+            "Use '*' for local/dev demos; in production set explicit origins "
+            "(e.g. 'https://docu.example.com,https://www.docu.example.com')."
+        ),
+    )
     use_pii_redaction: bool = Field(default=True, alias="USE_PII_REDACTION")
     use_pii_redaction_on_ingest: bool = Field(default=True, alias="USE_PII_REDACTION_ON_INGEST")
     api_warmup_models: bool = Field(default=True, alias="API_WARMUP_MODELS")
+
+    @property
+    def cors_allow_origins_list(self) -> list[str]:
+        """Parse ``CORS_ALLOW_ORIGINS`` into a list. Empty input falls back to ``['*']``."""
+        raw = (self.cors_allow_origins or "").strip()
+        if not raw or raw == "*":
+            return ["*"]
+        origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+        return origins or ["*"]
 
     # --- Observability ---
     log_level: str = "INFO"

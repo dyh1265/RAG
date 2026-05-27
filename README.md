@@ -7,6 +7,25 @@
 
 Upload a PDF, chat with it, get cited answers. Production-grade multimodal RAG over text, tables, and figures — with hybrid retrieval, taxonomy conformity checks, PII redaction, and an OpenTelemetry-instrumented FastAPI backend.
 
+## Demo
+
+![DocuMind end-to-end demo](docs/images/demo.gif)
+
+<table>
+<tr>
+<td><img src="docs/images/upload.png" alt="Upload a PDF" /></td>
+<td><img src="docs/images/chat.png" alt="Chat with cited answers" /></td>
+<td><img src="docs/images/citations.png" alt="Inspect cited source" /></td>
+</tr>
+<tr>
+<td align="center"><sub>Upload &amp; index a PDF</sub></td>
+<td align="center"><sub>Ask, get a cited answer</sub></td>
+<td align="center"><sub>Jump to the source page</sub></td>
+</tr>
+</table>
+
+> Capture instructions live in [`docs/images/README.md`](docs/images/README.md).
+
 ## Architecture
 
 ```mermaid
@@ -143,6 +162,44 @@ All backend settings live in [`backend/core/config.py`](backend/core/config.py) 
 | `USE_PII_REDACTION` | `true` | Presidio + spaCy redaction on query and ingest |
 | `USE_OCR` | `true` | Tesseract OCR for image-only PDF pages |
 | `API_WARMUP_MODELS` | `true` | Eager model load on boot (slower start, faster first query) |
+| `CORS_ALLOW_ORIGINS` | `*` | Comma-separated allowed origins. Use `*` for local/demo; set explicit origins in production. |
+
+## Benchmarks
+
+Retrieval quality is enforced as a hard gate in CI on every push and on a
+weekly schedule. The numbers below are the **minimum thresholds** that the
+[`tests/eval/`](tests/eval/) suite must clear against
+[`tests/eval/golden_set.jsonl`](tests/eval/golden_set.jsonl) — a hand-curated
+golden set of questions paired with the pages they should retrieve from
+[`data/raw/sample_report.pdf`](data/raw/sample_report.pdf).
+
+| Metric | CI-enforced minimum | What it measures |
+|---|---|---|
+| Recall@5 | ≥ **0.70** | Fraction of relevant pages retrieved in top-5 |
+| Hit@5 | ≥ **0.80** | At least one relevant page in top-5 |
+| MRR | ≥ **0.50** | Mean reciprocal rank of the first relevant hit |
+| Keyword coverage | ≥ **0.66** | Required keywords present in the generated answer |
+| Faithfulness | ≥ **0.85** | Ragas faithfulness (opt-in, `pip install -e ".[eval]"`) |
+| p95 retrieval latency | ≤ **60 000 ms** | Retrieve-only wall clock after warmup (CPU runner) |
+
+Thresholds are sourced from
+[`backend/core/config.py`](backend/core/config.py) (`EVAL_*` env vars) so
+the same numbers gate CI, scheduled evals, and local runs. The scheduled
+[RAG Eval workflow](.github/workflows/eval.yml) writes a Markdown summary
+of the actual measured numbers to the GitHub Actions run page on every run.
+
+Reproduce locally:
+
+```bash
+( cd docker && docker compose up -d qdrant )
+python scripts/generate_sample_report.py   # one-off, PDF is also tracked
+pytest tests/eval/test_retrieval.py tests/eval/test_metrics.py -m eval -v
+```
+
+The latency budget is intentionally generous so CPU-only CI runners pass.
+On a modern laptop with the sample report indexed, retrieval typically
+clears p95 ≤ 1 500 ms even with hybrid + parent-expand on. Raise / lower
+the bar via `EVAL_RETRIEVAL_LATENCY_P95_MS`.
 
 ## Cleanup
 
