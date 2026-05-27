@@ -30,7 +30,7 @@ All defaults are tuned for the in-tree sample report and the CI golden set. See 
 
 | Env var | Default | What |
 |---|---|---|
-| `USE_HYBRID` | `false` (`true` in API runtime) | BM25 + dense fusion on `text_chunks`. |
+| `USE_HYBRID` | `false` | BM25 + dense fusion on `text_chunks`. Recommended `true` for production. |
 | `USE_RECURSIVE_CHUNKER` | `false` | Token-aware splitter (recommended on; sample uses default). |
 | `USE_SEMANTIC_CHUNKER` | `false` | Alternative to recursive — splits on semantic boundaries. |
 | `SEMANTIC_CHUNK_THRESHOLD` | `0.75` | Cosine threshold for the semantic chunker. |

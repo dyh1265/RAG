@@ -45,7 +45,7 @@ This is intentionally lightweight — the hint *biases* but doesn't *gate*. A qu
 
 ## 2. Hybrid retrieval (text only)
 
-When `USE_HYBRID=true` (default in production), [`HybridRetriever`](https://github.com/dyh1265/RAG/blob/master/backend/retrieval/hybrid_retriever.py) combines:
+When `USE_HYBRID=true` (off by default; turn it on in `.env`), [`HybridRetriever`](https://github.com/dyh1265/RAG/blob/master/backend/retrieval/hybrid_retriever.py) combines:
 
 - **Dense**: top-K nearest neighbours from Qdrant on the BGE-M3 embedding of the question.
 - **Sparse**: BM25 over the same chunks, using `rank-bm25` with a tokenizer that handles numeric tokens and hyphenated terms.
