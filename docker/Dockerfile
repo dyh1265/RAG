@@ -3,10 +3,16 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Build-time switch between CPU and CUDA PyTorch wheels. Override from compose:
+#   args:
+#     TORCH_INDEX_URL: https://download.pytorch.org/whl/cu121
+# CUDA wheels are ~2.5 GB vs ~200 MB for CPU; only build the GPU image on hosts
+# that actually have an NVIDIA GPU + the NVIDIA Container Toolkit.
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    EMBEDDING_DEVICE=cpu \
     USE_COLPALI=false \
     PIP_NO_CACHE_DIR=1
 
@@ -14,7 +20,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends tesseract-ocr \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --upgrade pip \
-    && pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu \
+    && pip install torch torchvision --index-url "${TORCH_INDEX_URL}" \
     && pip install \
         "pydantic>=2.0" \
         "pydantic-settings>=2.0" \

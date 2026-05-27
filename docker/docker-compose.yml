@@ -1,5 +1,7 @@
-# Start the full stack (UI on http://localhost):
+# Start the full stack on CPU (default, works on any host):
 #     docker compose --profile production up -d --build
+# Same stack, but build the GPU image and reserve an NVIDIA GPU per container:
+#     docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile production up -d --build
 # Frontend hot-reload (Vite on http://localhost:5173):
 #     docker compose --profile dev up -d --build
 # Just vector + cache (for `uvicorn` + `npm run dev` on the host):
@@ -95,6 +97,9 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+      args:
+        # Overridden to a CUDA wheel by docker-compose.gpu.yml.
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
     container_name: rag_api
     ports:
       - "127.0.0.1:8002:8000"
@@ -135,6 +140,8 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+      args:
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
     image: rag-api-backend:latest
     container_name: rag_ingest_worker
     env_file:

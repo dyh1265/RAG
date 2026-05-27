@@ -75,12 +75,28 @@ cp .env.example .env
 
 ### 2. Start everything in Docker
 
+CPU (default, works on any host):
+
 ```bash
 cd docker
 docker compose --profile production up -d --build
 ```
 
-First build downloads PyTorch + spaCy + Presidio (~3 GB). On a 4 GB+ VM, expect 10–15 min.
+GPU (requires NVIDIA GPU + driver, plus the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) on Linux or Docker Desktop with WSL2 GPU support on Windows):
+
+```bash
+cd docker
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile production up -d --build
+```
+
+First CPU build downloads PyTorch + spaCy + Presidio (~3 GB). The GPU build adds the CUDA PyTorch wheels (~5 GB total). On a 4 GB+ VM the CPU build takes 10–15 min; the GPU build needs roughly the same on bandwidth and a host that already has the NVIDIA toolkit configured.
+
+Verify GPU is actually wired up (after the GPU stack is up):
+
+```bash
+docker compose exec rag-api python -c "import torch; print(torch.cuda.is_available(), torch.cuda.device_count())"
+# expected: True 1   (False 0 means torch is CPU-only — rebuild without cached layers)
+```
 
 The same compose layout drives local use, public demos (Cloudflare Tunnel), and Oracle/GCP/Fly VMs. Only the web container exposes a public port (`80`); Qdrant, Redis, and the API bind to `127.0.0.1`.
 

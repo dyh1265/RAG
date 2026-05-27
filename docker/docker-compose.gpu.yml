@@ -1,0 +1,43 @@
+# GPU overlay. Combine with the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml \
+#     --profile production up -d --build
+#
+# Requirements on the host:
+#   - NVIDIA GPU + driver (`nvidia-smi` works on the host)
+#   - NVIDIA Container Toolkit installed (Linux) or Docker Desktop with WSL2
+#     GPU support enabled (Windows)
+#
+# Picking a different CUDA wheel: set TORCH_INDEX_URL in your shell before
+# building, e.g.
+#   $env:TORCH_INDEX_URL = "https://download.pytorch.org/whl/cu124"
+# Defaults to cu121 which has the broadest current compatibility.
+
+services:
+  rag-api:
+    build:
+      args:
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu121}
+    environment:
+      EMBEDDING_DEVICE: cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  ingest-worker:
+    build:
+      args:
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu121}
+    environment:
+      EMBEDDING_DEVICE: cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
