@@ -14,6 +14,26 @@ on:
       - ".github/workflows/eval.yml"
 
 jobs:
+  # GitHub doesn't reliably evaluate `secrets.*` inside job-level `if:`
+  # expressions (silently false on fork PRs, and flagged by actions-lint).
+  # The documented workaround is to surface the secret presence as a plain
+  # string output from a guard job and condition downstream jobs on that.
+  check-secrets:
+    name: Check optional secrets
+    runs-on: ubuntu-latest
+    outputs:
+      has_openai_key: ${{ steps.probe.outputs.has_openai_key }}
+    steps:
+      - id: probe
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -n "${OPENAI_API_KEY}" ]; then
+            echo "has_openai_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_openai_key=false" >> "$GITHUB_OUTPUT"
+          fi
+
   retrieval-eval:
     name: Retrieval benchmarks
     runs-on: ubuntu-latest
@@ -73,7 +93,8 @@ jobs:
   answer-eval:
     name: Answer quality (OpenAI)
     runs-on: ubuntu-latest
-    if: ${{ secrets.OPENAI_API_KEY != '' }}
+    needs: check-secrets
+    if: needs.check-secrets.outputs.has_openai_key == 'true'
     services:
       qdrant:
         image: qdrant/qdrant:v1.12.5
