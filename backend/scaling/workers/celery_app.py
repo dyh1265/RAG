@@ -23,6 +23,11 @@ app.conf.update(
     accept_content=["json"],
     timezone="UTC",
     enable_utc=True,
+    # Model preload in worker_process_init takes ~25s on a cold CPU container
+    # (BGE-M3 + CLIP). Billiard's default 4s "alive ack" timeout SIGKILLs the
+    # child before it finishes, sending the pool into a respawn loop after any
+    # crash. Give the child enough headroom to actually come up.
+    worker_proc_alive_timeout=120.0,
 )
 
 

@@ -148,6 +148,12 @@ services:
       USE_HYBRID: "true"
       USE_RECURSIVE_CHUNKER: "true"
       USE_OCR: "true"
+      # Memory diet for the 8 GB host: spaCy+Presidio (~600 MB) on every fork
+      # was pushing the worker past 5 GB RSS and into OOM-kill. Query-time
+      # redaction in rag-api still applies; ingested chunks are not exposed
+      # publicly until queried.
+      USE_PII_REDACTION: "false"
+      USE_PII_REDACTION_ON_INGEST: "false"
       INGEST_METRICS_PORT: "9100"
       PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
     ports:
