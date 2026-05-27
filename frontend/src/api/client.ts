@@ -11,8 +11,21 @@ import type {
   QueryResponse,
   ReadyResponse,
 } from "../types";
+import { parseApiErrorBody } from "../utils/apiErrors";
 
 const STORAGE_KEY = "documind.apiUrl";
+
+/** Read an errored Response and throw a short user-facing message.
+ * Never throws a raw nginx/Cloudflare HTML page into the UI. */
+async function throwApiError(res: Response, fallback: string): Promise<never> {
+  let body = "";
+  try {
+    body = await res.text();
+  } catch {
+    /* body already consumed or aborted — keep going with the fallback */
+  }
+  throw new Error(parseApiErrorBody(body, res.status) || `${fallback} (${res.status})`);
+}
 
 /** Default: same-origin `/api` proxy (Vite dev + prod nginx). */
 export function getDefaultApiBase(): string {
@@ -75,7 +88,7 @@ export class RagApiClient {
       { signal },
       RagApiClient.CONNECT_TIMEOUT_MS,
     );
-    if (!res.ok) throw new Error(`Health check failed (${res.status})`);
+    if (!res.ok) await throwApiError(res, "Health check failed");
     return res.json();
   }
 
@@ -85,9 +98,8 @@ export class RagApiClient {
       { signal },
       RagApiClient.CONNECT_TIMEOUT_MS,
     );
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.status ?? "not ready");
-    return data;
+    if (!res.ok) await throwApiError(res, "Not ready");
+    return res.json();
   }
 
   async ingest(file: File, signal?: AbortSignal): Promise<IngestResponse> {
@@ -98,10 +110,7 @@ export class RagApiClient {
       body: form,
       signal,
     });
-    if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(detail || `Ingest failed (${res.status})`);
-    }
+    if (!res.ok) await throwApiError(res, "Ingest failed");
     return res.json();
   }
 
@@ -116,10 +125,7 @@ export class RagApiClient {
       body: JSON.stringify({ folder_name: folderName, total_files: totalFiles }),
       signal,
     });
-    if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(detail || `Bulk ingest start failed (${res.status})`);
-    }
+    if (!res.ok) await throwApiError(res, "Bulk ingest start failed");
     return res.json();
   }
 
@@ -135,10 +141,7 @@ export class RagApiClient {
       body: form,
       signal,
     });
-    if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(detail || `Bulk upload failed (${res.status})`);
-    }
+    if (!res.ok) await throwApiError(res, "Bulk upload failed");
     return res.json();
   }
 
@@ -147,10 +150,7 @@ export class RagApiClient {
       method: "POST",
       signal,
     });
-    if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(detail || `Bulk ingest queue failed (${res.status})`);
-    }
+    if (!res.ok) await throwApiError(res, "Bulk ingest queue failed");
     return res.json();
   }
 
@@ -159,26 +159,19 @@ export class RagApiClient {
       method: "POST",
       signal,
     });
-    if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(detail || `Bulk ingest resume failed (${res.status})`);
-    }
+    if (!res.ok) await throwApiError(res, "Bulk ingest resume failed");
     return res.json();
   }
 
   async getBulkIngestJob(jobId: string, signal?: AbortSignal): Promise<BulkIngestJob> {
     const res = await fetch(this.url(`/ingest/bulk/${jobId}`), { signal });
-    if (!res.ok) {
-      throw new Error(`Bulk job status failed (${res.status})`);
-    }
+    if (!res.ok) await throwApiError(res, "Bulk job status failed");
     return res.json();
   }
 
   async listDocuments(signal?: AbortSignal): Promise<DocumentSummary[]> {
     const res = await fetch(this.url("/admin/documents"), { signal });
-    if (!res.ok) {
-      throw new Error(`Failed to list documents (${res.status})`);
-    }
+    if (!res.ok) await throwApiError(res, "Failed to list documents");
     return res.json();
   }
 
@@ -190,19 +183,14 @@ export class RagApiClient {
       this.url(`/admin/documents/${encodeURIComponent(docId)}/suggestions`),
       { signal },
     );
-    if (!res.ok) {
-      throw new Error(`Failed to load suggestions (${res.status})`);
-    }
+    if (!res.ok) await throwApiError(res, "Failed to load suggestions");
     return res.json();
   }
 
   async browseDirectories(path?: string, signal?: AbortSignal): Promise<DirectoryBrowseResponse> {
     const query = path ? `?path=${encodeURIComponent(path)}` : "";
     const res = await fetch(this.url(`/admin/directories${query}`), { signal });
-    if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(detail || `Failed to browse directories (${res.status})`);
-    }
+    if (!res.ok) await throwApiError(res, "Failed to browse directories");
     return res.json();
   }
 
@@ -211,9 +199,7 @@ export class RagApiClient {
       method: "DELETE",
       signal,
     });
-    if (!res.ok) {
-      throw new Error(`Failed to delete document (${res.status})`);
-    }
+    if (!res.ok) await throwApiError(res, "Failed to delete document");
   }
 
   async ingestDirectory(
@@ -230,10 +216,7 @@ export class RagApiClient {
       }),
       signal,
     });
-    if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(detail || `Directory ingest failed (${res.status})`);
-    }
+    if (!res.ok) await throwApiError(res, "Directory ingest failed");
     return res.json();
   }
 
@@ -258,10 +241,7 @@ export class RagApiClient {
       }),
       signal,
     });
-    if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(detail || `Query failed (${res.status})`);
-    }
+    if (!res.ok) await throwApiError(res, "Query failed");
     return res.json();
   }
 }
