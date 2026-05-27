@@ -17,14 +17,25 @@ from backend.core.models import DocumentChunk, DocumentType
 
 
 def stable_doc_id(path: str | Path) -> str:
-    """Deterministic document ID — stable across host/Docker path prefixes."""
-    path = Path(path)
-    parts = [p.lower() for p in path.parts]
+    """Deterministic document ID — stable across host/Docker path prefixes.
+
+    Must work cross-platform: a Windows-style host path like
+    ``C:\\Users\\me\\RAG\\data\\raw\\long_report.pdf`` and the corresponding
+    container path ``/app/data/raw/long_report.pdf`` should hash identically
+    regardless of whether this code runs on Windows, Linux, or macOS. We
+    therefore split on both path separators ourselves instead of relying on
+    ``Path.parts``, which treats backslashes as filename characters on POSIX.
+    """
+    raw = str(path).replace("\\", "/")
+    parts = [p.lower() for p in raw.split("/") if p]
+    # Drop a Windows drive letter like ``C:`` if present at the front.
+    if parts and len(parts[0]) == 2 and parts[0].endswith(":"):
+        parts = parts[1:]
     if "raw" in parts:
         idx = parts.index("raw")
         key = "/".join(parts[idx:])
     else:
-        key = path.name.lower()
+        key = parts[-1] if parts else ""
     return hashlib.sha256(key.encode()).hexdigest()[:16]
 
 
