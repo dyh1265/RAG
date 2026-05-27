@@ -1,13 +1,22 @@
 """
 Generate data/raw/sample_report.pdf for ingestion / quickstart demos.
 
+The output is byte-reproducible. Both matplotlib's PNG tEXt chunks and
+PyMuPDF's PDF metadata are pinned to a fixed timestamp so the tracked
+``data/raw/sample_report.pdf`` does not churn across regenerations.
+Override the timestamp by setting ``SOURCE_DATE_EPOCH`` (Unix seconds, UTC),
+following the Reproducible Builds convention.
+
 Usage:
     python scripts/generate_sample_report.py
+    SOURCE_DATE_EPOCH=1704067200 python scripts/generate_sample_report.py
 """
 
 from __future__ import annotations
 
 import io
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 import fitz  # PyMuPDF
@@ -19,8 +28,23 @@ OUTPUT = ROOT / "data" / "raw" / "sample_report.pdf"
 MARGIN = 54
 PAGE_W, PAGE_H = fitz.paper_size("letter")
 
+# Default to 2024-01-01 00:00:00 UTC so every regeneration produces the same
+# bytes when SOURCE_DATE_EPOCH is unset. https://reproducible-builds.org/
+_DEFAULT_EPOCH = 1_704_067_200
 
-def _chart_png() -> bytes:
+
+def _build_timestamp() -> datetime:
+    raw = os.environ.get("SOURCE_DATE_EPOCH")
+    epoch = int(raw) if raw else _DEFAULT_EPOCH
+    return datetime.fromtimestamp(epoch, tz=timezone.utc)
+
+
+def _pdf_date(ts: datetime) -> str:
+    """PDF date literal: ``D:YYYYMMDDHHmmSS+00'00'`` (PDF 1.7 §7.9.4)."""
+    return ts.strftime("D:%Y%m%d%H%M%S+00'00'")
+
+
+def _chart_png(ts: datetime) -> bytes:
     import matplotlib
 
     matplotlib.use("Agg")
@@ -40,7 +64,16 @@ def _chart_png() -> bytes:
     fig.tight_layout()
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight")
+    # Pin PNG tEXt chunks; matplotlib normally writes "Software" + current "Date".
+    fig.savefig(
+        buf,
+        format="png",
+        bbox_inches="tight",
+        metadata={
+            "Software": "",
+            "Creation Time": ts.strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+        },
+    )
     plt.close(fig)
     return buf.getvalue()
 
@@ -104,8 +137,9 @@ def _add_table(
 
 def build_pdf() -> None:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    ts = _build_timestamp()
     doc = fitz.open()
-    chart = _chart_png()
+    chart = _chart_png(ts)
 
     # --- Page 1: Executive summary ---
     p1 = doc.new_page(width=PAGE_W, height=PAGE_H)
@@ -205,9 +239,23 @@ def build_pdf() -> None:
         "deeper integration with existing CRM and ERP platforms.",
     )
 
-    doc.save(OUTPUT)
+    # Pin the PDF Info dict so /CreationDate, /ModDate, and /ID don't churn.
+    pdf_date = _pdf_date(ts)
+    doc.set_metadata(
+        {
+            "title": "Acme Corp — Annual Performance Report 2024",
+            "author": "DocuMind sample data",
+            "subject": "Reproducible synthetic report used by tests/eval and quickstart",
+            "creator": "scripts/generate_sample_report.py",
+            "producer": "PyMuPDF",
+            "creationDate": pdf_date,
+            "modDate": pdf_date,
+        }
+    )
+    # ``no_new_id`` prevents PyMuPDF from hashing the wall clock into /ID.
+    doc.save(OUTPUT, no_new_id=True)
     doc.close()
-    print(f"Wrote {OUTPUT} ({OUTPUT.stat().st_size // 1024} KB)")
+    print(f"Wrote {OUTPUT} ({OUTPUT.stat().st_size // 1024} KB) — SOURCE_DATE_EPOCH={int(ts.timestamp())}")
 
 
 if __name__ == "__main__":

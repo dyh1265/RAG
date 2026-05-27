@@ -37,6 +37,11 @@ jobs:
   retrieval-eval:
     name: Retrieval benchmarks
     runs-on: ubuntu-latest
+    # Reproducible Builds convention: pin every wall-clock timestamp that
+    # would otherwise leak into generated artifacts (PDF /CreationDate,
+    # PNG tEXt chunks, etc.) so re-runs produce byte-identical outputs.
+    env:
+      SOURCE_DATE_EPOCH: "1704067200"
     services:
       qdrant:
         image: qdrant/qdrant:v1.12.5
@@ -95,6 +100,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: check-secrets
     if: needs.check-secrets.outputs.has_openai_key == 'true'
+    env:
+      SOURCE_DATE_EPOCH: "1704067200"
     services:
       qdrant:
         image: qdrant/qdrant:v1.12.5
