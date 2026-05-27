@@ -712,6 +712,41 @@ body {
   margin: 0 0 1rem;
 }
 
+.ingest-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.ingest-meta-file {
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ingest-meta-dot {
+  opacity: 0.5;
+}
+
+.ingest-meta-elapsed {
+  font-variant-numeric: tabular-nums;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.ingest-detail {
+  margin: 0.35rem 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--primary);
+  font-weight: 500;
+}
+
 .spinner {
   width: 36px;
   height: 36px;

@@ -22,6 +22,27 @@ def _ingest_only_config() -> PipelineConfig:
     )
 
 
+def test_ingest_emits_progress_stages():
+    chunk = make_chunk(chunk_id="c1", chunk_type=ChunkType.TEXT, content="Revenue grew.")
+    store = MagicMock()
+    embedded = MagicMock(chunk=chunk, vector=[0.1], model_name="bge-m3")
+    stages: list[str] = []
+
+    pipeline = RAGPipeline(_ingest_only_config(), store=store)
+    pipeline._ingestion = MagicMock()
+    pipeline._ingestion.parse_safe.return_value = ([chunk], [])
+
+    def on_progress(stage: str, _message: str, _detail: dict | None) -> None:
+        stages.append(stage)
+
+    with patch("backend.core.pipeline.embed_chunks", return_value=[embedded]):
+        pipeline.ingest("/data/report.pdf", on_progress=on_progress)
+
+    assert "parsing" in stages
+    assert "embedding" in stages
+    assert "indexing" in stages
+
+
 def test_ingest_parses_embeds_and_upserts():
     chunk = make_chunk(chunk_id="c1", chunk_type=ChunkType.TEXT, content="Revenue grew.")
     store = MagicMock()

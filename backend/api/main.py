@@ -35,14 +35,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         block_forbidden_classifications=settings.taxonomy_block_forbidden,
     )
     app.state.pipeline = RAGPipeline(config)
+    app.state.models_ready: bool | None = None
+    app.state.models_error: str | None = None
     print(f"[startup] RAG API on {settings.api_host}:{settings.api_port}")
 
     if settings.api_warmup_models:
-        async def _warmup() -> None:
+        try:
             ms = await asyncio.to_thread(app.state.pipeline.preload_models)
+            app.state.models_ready = True
             print(f"[startup] models preloaded in {ms:.0f}ms")
-
-        asyncio.create_task(_warmup())
+        except Exception as exc:
+            app.state.models_ready = False
+            app.state.models_error = str(exc)
+            print(f"[startup] model preload FAILED: {exc}")
 
     yield
     print("[shutdown] RAG API shutting down.")

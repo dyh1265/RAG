@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from functools import lru_cache
 from typing import TYPE_CHECKING
@@ -10,6 +11,10 @@ from backend.core.config import get_settings
 
 if TYPE_CHECKING:
     from backend.core.models import QueryResponse
+
+# The default spaCy model bundled in the Docker image. Presidio otherwise
+# tries to download ``en_core_web_lg`` (~400 MB) on the first analyze() call.
+_SPACY_MODEL = "en_core_web_sm"
 
 # Contact/financial identifiers only.
 # Omit US_DRIVER_LICENSE (false positives on job refs like "e02") and DATE_TIME (years, Q1–Q4).
@@ -32,13 +37,26 @@ _FISCAL_QUARTER_RE = re.compile(r"^Q\d+$", re.IGNORECASE)
 def _engines():
     try:
         from presidio_analyzer import AnalyzerEngine
+        from presidio_analyzer.nlp_engine import NlpEngineProvider
         from presidio_anonymizer import AnonymizerEngine
     except ImportError as exc:
         raise ImportError(
             "presidio not installed; run `pip install -e .` from the repo root."
         ) from exc
 
-    return AnalyzerEngine(), AnonymizerEngine()
+    # Silence the noisy "Recognizer not added to registry because language is
+    # not supported" warnings emitted at import time — we explicitly pin the
+    # registry to English below, so non-EN recognizers are expected to skip.
+    logging.getLogger("presidio-analyzer").setLevel(logging.ERROR)
+
+    nlp_engine = NlpEngineProvider(
+        nlp_configuration={
+            "nlp_engine_name": "spacy",
+            "models": [{"lang_code": "en", "model_name": _SPACY_MODEL}],
+        }
+    ).create_engine()
+    analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en"])
+    return analyzer, AnonymizerEngine()
 
 
 class PIIRedactor:

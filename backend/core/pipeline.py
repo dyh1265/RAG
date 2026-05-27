@@ -8,8 +8,12 @@ ingestion / retrieval / scaling components directly.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+
+IngestProgressFn = Callable[[str, str, dict[str, Any] | None], None]
 
 from backend.core.config import get_settings
 from backend.core.models import QueryRequest, QueryResponse, RetrievedContext
@@ -182,12 +186,36 @@ class RAGPipeline:
             or self.config.use_context_enrichment
         )
 
-    def ingest(self, path: str | Path) -> IngestResult:
+    def _emit_progress(
+        self,
+        on_progress: IngestProgressFn | None,
+        stage: str,
+        message: str,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        if on_progress is not None:
+            on_progress(stage, message, detail)
+
+    def ingest(
+        self,
+        path: str | Path,
+        *,
+        on_progress: IngestProgressFn | None = None,
+    ) -> IngestResult:
         """Parse a document, embed chunks, and upsert into Qdrant."""
         pdf_path = Path(path)
+        self._emit_progress(on_progress, "parsing", "Reading PDF pages…")
+
         chunks, errors = self._ingestion.parse_safe(pdf_path)
+        self._emit_progress(
+            on_progress,
+            "parsing",
+            f"Parsed {len(chunks)} chunks",
+            {"chunk_count": len(chunks), "parser_errors": len(errors)},
+        )
 
         if self._retrieval_enrichment_enabled():
+            self._emit_progress(on_progress, "enriching", "Chunking and enriching…")
             chunks = apply_retrieval_ingest(
                 chunks,
                 pdf_path,
@@ -197,6 +225,12 @@ class RAGPipeline:
                     use_semantic_chunker=self.config.use_semantic_chunker,
                     use_context_enrichment=self.config.use_context_enrichment,
                 ),
+            )
+            self._emit_progress(
+                on_progress,
+                "enriching",
+                f"Enriched to {len(chunks)} chunks",
+                {"chunk_count": len(chunks)},
             )
 
         chunks_by_type: dict[str, int] = {}
@@ -216,13 +250,22 @@ class RAGPipeline:
         try:
             from backend.api.guardrails.pii import redact_chunk_contents
 
+            self._emit_progress(on_progress, "redacting", "Applying PII redaction…")
             redact_chunk_contents(chunks)
         except ImportError:
             pass
 
         doc_id = stable_doc_id(pdf_path)
+        self._emit_progress(on_progress, "indexing", "Clearing previous vectors for document…")
         self.store.delete_doc(doc_id)
         invalidate_retrieval_caches(doc_id)
+
+        self._emit_progress(
+            on_progress,
+            "embedding",
+            f"Embedding {len(chunks)} chunks (BGE-M3 + CLIP)…",
+            {"chunk_count": len(chunks), "chunks_by_type": chunks_by_type},
+        )
         embedded = embed_chunks(
             chunks,
             self.text_embedder,
@@ -230,12 +273,27 @@ class RAGPipeline:
             self.colpali_embedder if self.config.use_colpali else None,
             use_colpali=self.config.use_colpali,
         )
+        self._emit_progress(
+            on_progress,
+            "embedding",
+            f"Embedded {len(embedded)} vectors",
+            {"vector_count": len(embedded)},
+        )
+
+        self._emit_progress(on_progress, "indexing", "Writing vectors to Qdrant…")
         self.store.upsert(embedded)
 
         vectors_by_collection: dict[str, int] = {}
         for ec in embedded:
             col = COLLECTION_MAP.get(ec.chunk.chunk_type, "text_chunks")
             vectors_by_collection[col] = vectors_by_collection.get(col, 0) + 1
+
+        self._emit_progress(
+            on_progress,
+            "indexing",
+            "Indexed successfully",
+            {"vectors_by_collection": vectors_by_collection},
+        )
 
         return IngestResult(
             doc_id=doc_id,

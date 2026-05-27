@@ -11,13 +11,14 @@
 # Picking a different CUDA wheel: set TORCH_INDEX_URL in your shell before
 # building, e.g.
 #   $env:TORCH_INDEX_URL = "https://download.pytorch.org/whl/cu124"
-# Defaults to cu121 which has the broadest current compatibility.
+# Defaults to cu124 — transformers 5.x needs torch>=2.6; the cu121 index only
+# ships torch 2.5.x.
 
 services:
   rag-api:
     build:
       args:
-        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu121}
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu124}
     environment:
       EMBEDDING_DEVICE: cuda
     deploy:
@@ -31,7 +32,7 @@ services:
   ingest-worker:
     build:
       args:
-        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu121}
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu124}
     environment:
       EMBEDDING_DEVICE: cuda
     deploy:

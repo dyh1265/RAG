@@ -6,7 +6,7 @@ import asyncio
 import json
 import time
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from backend.api.dependencies import get_pipeline
@@ -68,6 +68,18 @@ async def query_json(
             block_forbidden=body.block_forbidden,
         )
         return out
+    except ValueError as exc:
+        msg = str(exc)
+        if "torch.load" in msg or "upgrade torch" in msg:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Embedding models failed to load (PyTorch too old for this "
+                    "transformers release). Rebuild Docker with torch>=2.6 "
+                    "(GPU: use cu124 wheels)."
+                ),
+            ) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
     finally:
         QUERY_LATENCY.observe(time.perf_counter() - t0)
 

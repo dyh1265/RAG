@@ -51,6 +51,13 @@ export interface IngestResponse {
   skipped: boolean;
 }
 
+/** Live progress from POST /ingest/stream (SSE `progress` events). */
+export interface IngestProgressEvent {
+  stage: string;
+  message: string;
+  detail?: Record<string, unknown>;
+}
+
 export interface HealthResponse {
   status: string;
 }

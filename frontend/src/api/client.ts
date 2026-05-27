@@ -6,12 +6,14 @@ import type {
   DocumentSuggestions,
   DirectoryIngestResponse,
   HealthResponse,
+  IngestProgressEvent,
   IngestResponse,
   LlmProvider,
   QueryResponse,
   ReadyResponse,
 } from "../types";
 import { parseApiErrorBody } from "../utils/apiErrors";
+import { readSseStream } from "../utils/sse";
 
 const STORAGE_KEY = "documind.apiUrl";
 
@@ -112,6 +114,44 @@ export class RagApiClient {
     });
     if (!res.ok) await throwApiError(res, "Ingest failed");
     return res.json();
+  }
+
+  /** Ingest with Server-Sent Events progress (POST /ingest/stream). */
+  async ingestStream(
+    file: File,
+    onProgress: (event: IngestProgressEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<IngestResponse> {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    const res = await fetch(this.url("/ingest/stream"), {
+      method: "POST",
+      body: form,
+      signal,
+    });
+    if (!res.ok) await throwApiError(res, "Ingest failed");
+
+    let result: IngestResponse | null = null;
+    let streamError: string | null = null;
+
+    await readSseStream(
+      res,
+      (event, data) => {
+        if (event === "progress") {
+          onProgress(JSON.parse(data) as IngestProgressEvent);
+        } else if (event === "done") {
+          result = JSON.parse(data) as IngestResponse;
+        } else if (event === "error") {
+          const parsed = JSON.parse(data) as { message?: string };
+          streamError = parsed.message ?? "Ingest failed";
+        }
+      },
+      signal,
+    );
+
+    if (streamError) throw new Error(streamError);
+    if (!result) throw new Error("Ingest finished without a result");
+    return result;
   }
 
   async bulkIngestStart(

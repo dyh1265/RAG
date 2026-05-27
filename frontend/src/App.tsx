@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RagApiClient, loadApiBase, saveApiBase } from "./api/client";
-import type { ChatMessage, FolderLoadProgress, IngestResponse, LlmProvider, RecentDocument } from "./types";
+import type {
+  ChatMessage,
+  FolderLoadProgress,
+  IngestProgressEvent,
+  IngestResponse,
+  LlmProvider,
+  RecentDocument,
+} from "./types";
 import { Sidebar } from "./components/Sidebar";
 import { PdfUploader } from "./components/PdfUploader";
 import { ChatPanel } from "./components/ChatPanel";
@@ -34,6 +41,8 @@ export default function App() {
     return active ? loadChat(active) : [];
   });
   const [ingesting, setIngesting] = useState(false);
+  const [ingestFile, setIngestFile] = useState<{ name: string; size: number } | null>(null);
+  const [ingestProgress, setIngestProgress] = useState<IngestProgressEvent | null>(null);
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bulkIndexing, setBulkIndexing] = useState(false);
@@ -146,11 +155,17 @@ export default function App() {
   const handleIngest = async (file: File) => {
     setError(null);
     setIngesting(true);
+    setIngestFile({ name: file.name, size: file.size });
+    setIngestProgress(null);
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const result = await client.ingest(file, controller.signal);
+      const result = await client.ingestStream(
+        file,
+        (ev) => setIngestProgress(ev),
+        controller.signal,
+      );
       setDocId(result.doc_id);
       saveActiveDocId(result.doc_id);
       setIngestInfo(result);
@@ -169,6 +184,8 @@ export default function App() {
       }
     } finally {
       setIngesting(false);
+      setIngestFile(null);
+      setIngestProgress(null);
     }
   };
 
@@ -439,7 +456,12 @@ export default function App() {
         )}
 
         {!docId ? (
-          <PdfUploader onUpload={handleIngest} ingesting={ingesting} />
+          <PdfUploader
+            onUpload={handleIngest}
+            ingesting={ingesting}
+            ingestFile={ingestFile}
+            ingestProgress={ingestProgress}
+          />
         ) : (
           <div className="workspace">
             <DocumentPreview

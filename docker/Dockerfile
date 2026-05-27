@@ -5,7 +5,9 @@ WORKDIR /app
 
 # Build-time switch between CPU and CUDA PyTorch wheels. Override from compose:
 #   args:
-#     TORCH_INDEX_URL: https://download.pytorch.org/whl/cu121
+#     TORCH_INDEX_URL: https://download.pytorch.org/whl/cu124
+# transformers>=5 requires torch>=2.6 for torch.load (CVE-2025-32434). The cu121
+# index only ships up to torch 2.5.x — use cu124 (or cpu) for GPU builds.
 # CUDA wheels are ~2.5 GB vs ~200 MB for CPU; only build the GPU image on hosts
 # that actually have an NVIDIA GPU + the NVIDIA Container Toolkit.
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
@@ -20,7 +22,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends tesseract-ocr \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --upgrade pip \
-    && pip install torch torchvision --index-url "${TORCH_INDEX_URL}" \
+    && pip install "torch>=2.6.0" "torchvision>=0.21.0" --index-url "${TORCH_INDEX_URL}" \
     && pip install \
         "pydantic>=2.0" \
         "pydantic-settings>=2.0" \
