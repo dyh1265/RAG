@@ -1,0 +1,1 @@
+Source for these pages lives in [`docs/wiki/`](https://github.com/dyh1265/RAG/tree/master/docs/wiki). Edits there are auto-published by the [Wiki Sync workflow](https://github.com/dyh1265/RAG/blob/master/.github/workflows/wiki.yml) on every push to `master`.

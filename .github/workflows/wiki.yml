@@ -1,0 +1,79 @@
+name: Wiki Sync
+
+# Mirror docs/wiki/ into the GitHub Wiki on every push to master.
+# See docs/wiki/README.md for the one-time setup (enabling workflow write
+# permissions). Falls back to a personal access token in $WIKI_TOKEN if the
+# default GITHUB_TOKEN cannot push to the wiki repo.
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "docs/wiki/**"
+      - ".github/workflows/wiki.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki-sync
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Publish docs/wiki -> Wiki
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Sanity check that there is content to publish
+        run: |
+          if ! ls docs/wiki/*.md >/dev/null 2>&1; then
+            echo "docs/wiki/ has no Markdown files; nothing to publish."
+            exit 0
+          fi
+          echo "Pages to publish:"
+          ls -1 docs/wiki/*.md
+
+      - name: Sync to wiki
+        env:
+          GH_TOKEN: ${{ secrets.WIKI_TOKEN || secrets.GITHUB_TOKEN }}
+          REPO_SLUG: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          tmp="$(mktemp -d)"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${REPO_SLUG}.wiki.git"
+
+          # `git clone` of a wiki repo fails with exit 128 if the wiki has
+          # never been initialised. Detect that and bail with a clear hint
+          # instead of a wall of git output.
+          if ! git clone --depth 1 "${remote}" "${tmp}" 2>/tmp/clone.err; then
+            echo "::error::Could not clone ${REPO_SLUG}.wiki.git"
+            cat /tmp/clone.err
+            echo "::error::If this is the first time, create any page via the"
+            echo "::error::GitHub UI at https://github.com/${REPO_SLUG}/wiki then"
+            echo "::error::re-run this workflow. See docs/wiki/README.md."
+            exit 1
+          fi
+
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='README.md' \
+            docs/wiki/ "${tmp}/"
+
+          cd "${tmp}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "Wiki already in sync; nothing to push."
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "docs(wiki): sync from ${GITHUB_SHA::7}"
+          git push origin HEAD

@@ -4,6 +4,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![CI](https://github.com/dyh1265/RAG/actions/workflows/ci.yml/badge.svg)](https://github.com/dyh1265/RAG/actions/workflows/ci.yml)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker)](docker/docker-compose.yml)
+[![Wiki](https://img.shields.io/badge/wiki-architecture%20%C2%B7%20retrieval%20%C2%B7%20eval-1f6feb)](https://github.com/dyh1265/RAG/wiki)
 
 Upload a PDF, chat with it, get cited answers. Production-grade multimodal RAG over text, tables, and figures — with hybrid retrieval, taxonomy conformity checks, PII redaction, and an OpenTelemetry-instrumented FastAPI backend.
 
@@ -246,6 +247,18 @@ rm -rf .pytest_cache .ruff_cache
 ## Public demo
 
 See [`deploy/README.md`](deploy/README.md) for Oracle/Fly/Cloudflare/GCP options. Bare minimum: a 4 GB VM + the same Docker stack.
+
+## Learn more
+
+The [project Wiki](https://github.com/dyh1265/RAG/wiki) is the long-form companion to this README. Recommended reading order:
+
+- [Architecture](https://github.com/dyh1265/RAG/wiki/Architecture) — service topology and request flow.
+- [RAG Pipeline](https://github.com/dyh1265/RAG/wiki/RAG-Pipeline) — every stage from parse to answer, with code references.
+- [Retrieval](https://github.com/dyh1265/RAG/wiki/Retrieval) — hybrid BM25 + dense, multimodal RRF fusion, parent expansion, rerankers, ColPali.
+- [Evaluation](https://github.com/dyh1265/RAG/wiki/Evaluation) — golden set, metrics, CI gates.
+- [Configuration](https://github.com/dyh1265/RAG/wiki/Configuration) — full env-var reference.
+
+Source for the wiki lives at [`docs/wiki/`](docs/wiki/) and auto-publishes on every push to `master` via the [Wiki Sync workflow](.github/workflows/wiki.yml).
 
 ## Contributing
 
