@@ -5,8 +5,11 @@
 [![CI](https://github.com/dyh1265/RAG/actions/workflows/ci.yml/badge.svg)](https://github.com/dyh1265/RAG/actions/workflows/ci.yml)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker)](docker/docker-compose.yml)
 [![Wiki](https://img.shields.io/badge/wiki-architecture%20%C2%B7%20retrieval%20%C2%B7%20eval-1f6feb)](https://github.com/dyh1265/RAG/wiki)
+[![Book](https://img.shields.io/badge/book-PDF%20reference-7c3aed)](docs/documind-book.pdf)
 
 Upload a PDF, chat with it, get cited answers. Production-grade multimodal RAG over text, tables, and figures — with hybrid retrieval, taxonomy conformity checks, PII redaction, and an OpenTelemetry-instrumented FastAPI backend.
+
+> Looking for the long-form deep dive? See [**DocuMind — The Complete Reference**](docs/documind-book.pdf) (42-page PDF, regenerated from the repo via `python scripts/generate_book.py`).
 
 ## Demo
 
