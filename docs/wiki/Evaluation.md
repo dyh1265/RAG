@@ -4,7 +4,7 @@ A RAG system that isn't evaluated is mostly guesswork. DocuMind ships a small, h
 
 ## Golden set
 
-[`tests/eval/golden_set.jsonl`](https://github.com/dyh1265/RAG/blob/master/tests/eval/golden_set.jsonl) is a JSONL of cases over [`data/raw/sample_report.pdf`](https://github.com/dyh1265/RAG/blob/master/data/raw/sample_report.pdf) — a synthetic but realistic annual report with text, a table, and a figure across three pages. The sample PDF is byte-reproducible (see [Configuration → SOURCE_DATE_EPOCH](Configuration)).
+[`tests/eval/golden_set.jsonl`](https://github.com/dyh1265/DocuMind/blob/master/tests/eval/golden_set.jsonl) is a JSONL of cases over [`data/raw/sample_report.pdf`](https://github.com/dyh1265/DocuMind/blob/master/data/raw/sample_report.pdf) — a synthetic but realistic annual report with text, a table, and a figure across three pages. The sample PDF is byte-reproducible (see [Configuration → SOURCE_DATE_EPOCH](Configuration)).
 
 Each row looks like:
 
@@ -32,7 +32,7 @@ If a code change improves text retrieval but breaks figure retrieval, the metric
 
 ## Metrics
 
-Implemented in [`tests/eval/metrics.py`](https://github.com/dyh1265/RAG/blob/master/tests/eval/metrics.py):
+Implemented in [`tests/eval/metrics.py`](https://github.com/dyh1265/DocuMind/blob/master/tests/eval/metrics.py):
 
 | Metric | What it asks |
 |---|---|
@@ -75,15 +75,15 @@ Two workflows run the eval, gated to keep CI cost predictable:
 
 | Workflow | When it runs | What it does |
 |---|---|---|
-| [`eval.yml` → `retrieval-eval`](https://github.com/dyh1265/RAG/blob/master/.github/workflows/eval.yml) | Weekly cron, every push touching `backend/retrieval/`, `backend/ingestion/`, `tests/eval/`, or `backend/core/pipeline.py`, and on demand | Spins up Qdrant as a service container, regenerates the sample PDF reproducibly, ingests it, runs the retrieval eval, **emits a Markdown benchmark summary** to the GitHub Actions run page, and uploads `benchmarks.md` as an artifact. |
-| [`eval.yml` → `answer-eval`](https://github.com/dyh1265/RAG/blob/master/.github/workflows/eval.yml) | Same triggers, gated on `OPENAI_API_KEY` repo secret | Adds a real OpenAI generation pass on top of the retrieved contexts and checks `keyword_coverage` against the threshold. |
+| [`eval.yml` → `retrieval-eval`](https://github.com/dyh1265/DocuMind/blob/master/.github/workflows/eval.yml) | Weekly cron, every push touching `backend/retrieval/`, `backend/ingestion/`, `tests/eval/`, or `backend/core/pipeline.py`, and on demand | Spins up Qdrant as a service container, regenerates the sample PDF reproducibly, ingests it, runs the retrieval eval, **emits a Markdown benchmark summary** to the GitHub Actions run page, and uploads `benchmarks.md` as an artifact. |
+| [`eval.yml` → `answer-eval`](https://github.com/dyh1265/DocuMind/blob/master/.github/workflows/eval.yml) | Same triggers, gated on `OPENAI_API_KEY` repo secret | Adds a real OpenAI generation pass on top of the retrieved contexts and checks `keyword_coverage` against the threshold. |
 
 The secret gate uses a small `check-secrets` job whose `has_openai_key` output the `answer-eval` job consumes via `needs:` — the documented workaround for [GitHub Actions not reliably evaluating `secrets.*` inside `if:`](https://docs.github.com/en/actions/security-guides/encrypted-secrets#using-encrypted-secrets-in-a-workflow).
 
 ## Adding a golden case
 
 1. Decide what the case tests (a metric, a modality, a corner case).
-2. Append a JSON line to [`tests/eval/golden_set.jsonl`](https://github.com/dyh1265/RAG/blob/master/tests/eval/golden_set.jsonl). `doc_id` must match the deterministic doc ID produced by [`stable_doc_id`](https://github.com/dyh1265/RAG/blob/master/backend/ingestion/parsers/base_parser.py) for the source PDF — easiest is `python -c "from backend.ingestion.parsers.base_parser import stable_doc_id; print(stable_doc_id('data/raw/sample_report.pdf'))"`.
+2. Append a JSON line to [`tests/eval/golden_set.jsonl`](https://github.com/dyh1265/DocuMind/blob/master/tests/eval/golden_set.jsonl). `doc_id` must match the deterministic doc ID produced by [`stable_doc_id`](https://github.com/dyh1265/DocuMind/blob/master/backend/ingestion/parsers/base_parser.py) for the source PDF — easiest is `python -c "from backend.ingestion.parsers.base_parser import stable_doc_id; print(stable_doc_id('data/raw/sample_report.pdf'))"`.
 3. Run `pytest tests/eval/test_retrieval.py -m eval -v` locally with Qdrant up.
 4. If the case fails, decide whether the case is unreasonable (drop it) or whether retrieval has a real gap (fix it).
 

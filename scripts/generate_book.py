@@ -597,7 +597,7 @@ def build_book() -> BookBuilder:
     b.para(
         "DocuMind — The Complete Reference describes the architecture, "
         "implementation, and operations of the open-source DocuMind project "
-        "(https://github.com/dyh1265/RAG). This book is generated directly "
+        "(https://github.com/dyh1265/DocuMind). This book is generated directly "
         "from the repository by the script scripts/generate_book.py and is "
         "byte-reproducible: re-running the script on the same source tree "
         "produces an identical PDF. The wall-clock fields the PDF format "

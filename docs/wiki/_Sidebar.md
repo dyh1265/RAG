@@ -9,7 +9,7 @@
 
 ---
 
-- [Repo](https://github.com/dyh1265/RAG)
-- [README](https://github.com/dyh1265/RAG#readme)
-- [Deploy guide](https://github.com/dyh1265/RAG/blob/master/deploy/README.md)
-- [Issues](https://github.com/dyh1265/RAG/issues)
+- [Repo](https://github.com/dyh1265/DocuMind)
+- [README](https://github.com/dyh1265/DocuMind#readme)
+- [Deploy guide](https://github.com/dyh1265/DocuMind/blob/master/deploy/README.md)
+- [Issues](https://github.com/dyh1265/DocuMind/issues)

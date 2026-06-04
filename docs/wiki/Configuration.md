@@ -1,8 +1,8 @@
 # Configuration
 
-Every backend setting comes from [`backend/core/config.py`](https://github.com/dyh1265/RAG/blob/master/backend/core/config.py) — a single `pydantic-settings` `Settings` class. There are no scattered `os.getenv()` calls. Override anything via `.env` (gitignored) or real environment variables; aliases below are what you put in the env.
+Every backend setting comes from [`backend/core/config.py`](https://github.com/dyh1265/DocuMind/blob/master/backend/core/config.py) — a single `pydantic-settings` `Settings` class. There are no scattered `os.getenv()` calls. Override anything via `.env` (gitignored) or real environment variables; aliases below are what you put in the env.
 
-If you only need the common toggles, the [README's Configuration table](https://github.com/dyh1265/RAG#configuration) is the short version. This page is the full reference.
+If you only need the common toggles, the [README's Configuration table](https://github.com/dyh1265/DocuMind#configuration) is the short version. This page is the full reference.
 
 ## LLM provider
 
@@ -113,7 +113,7 @@ These are the same numbers the [Evaluation](Evaluation) page lists, exposed as e
 
 ## Where each setting lives
 
-- **Static defaults**: [`backend/core/config.py`](https://github.com/dyh1265/RAG/blob/master/backend/core/config.py)
-- **Local override**: copy [`.env.example`](https://github.com/dyh1265/RAG/blob/master/.env.example) → `.env`, edit, never commit.
-- **CI override**: `env:` blocks in [`.github/workflows/ci.yml`](https://github.com/dyh1265/RAG/blob/master/.github/workflows/ci.yml) and [`.github/workflows/eval.yml`](https://github.com/dyh1265/RAG/blob/master/.github/workflows/eval.yml).
-- **Docker override**: `environment:` in [`docker/docker-compose.yml`](https://github.com/dyh1265/RAG/blob/master/docker/docker-compose.yml).
+- **Static defaults**: [`backend/core/config.py`](https://github.com/dyh1265/DocuMind/blob/master/backend/core/config.py)
+- **Local override**: copy [`.env.example`](https://github.com/dyh1265/DocuMind/blob/master/.env.example) → `.env`, edit, never commit.
+- **CI override**: `env:` blocks in [`.github/workflows/ci.yml`](https://github.com/dyh1265/DocuMind/blob/master/.github/workflows/ci.yml) and [`.github/workflows/eval.yml`](https://github.com/dyh1265/DocuMind/blob/master/.github/workflows/eval.yml).
+- **Docker override**: `environment:` in [`docker/docker-compose.yml`](https://github.com/dyh1265/DocuMind/blob/master/docker/docker-compose.yml).

@@ -1,6 +1,6 @@
 # Retrieval
 
-Retrieval is the bulk of DocuMind's complexity. The goal: given a natural-language question, return the smallest set of chunks (text, tables, figures, optionally page images) that lets the LLM answer with citations. This page walks through every stage that lives under [`backend/retrieval/`](https://github.com/dyh1265/RAG/tree/master/backend/retrieval).
+Retrieval is the bulk of DocuMind's complexity. The goal: given a natural-language question, return the smallest set of chunks (text, tables, figures, optionally page images) that lets the LLM answer with citations. This page walks through every stage that lives under [`backend/retrieval/`](https://github.com/dyh1265/DocuMind/tree/master/backend/retrieval).
 
 ## High-level flow
 
@@ -32,7 +32,7 @@ top-K → AnswerGenerator
 
 ## 1. Modality routing
 
-Implemented in [`MultiModalRetriever`](https://github.com/dyh1265/RAG/blob/master/backend/retrieval/multimodal_retriever.py). The query is classified with cheap regex / keyword heuristics:
+Implemented in [`MultiModalRetriever`](https://github.com/dyh1265/DocuMind/blob/master/backend/retrieval/multimodal_retriever.py). The query is classified with cheap regex / keyword heuristics:
 
 | Hint in the query | Collection biased |
 |---|---|
@@ -45,7 +45,7 @@ This is intentionally lightweight — the hint *biases* but doesn't *gate*. A qu
 
 ## 2. Hybrid retrieval (text only)
 
-When `USE_HYBRID=true` (off by default; turn it on in `.env`), [`HybridRetriever`](https://github.com/dyh1265/RAG/blob/master/backend/retrieval/hybrid_retriever.py) combines:
+When `USE_HYBRID=true` (off by default; turn it on in `.env`), [`HybridRetriever`](https://github.com/dyh1265/DocuMind/blob/master/backend/retrieval/hybrid_retriever.py) combines:
 
 - **Dense**: top-K nearest neighbours from Qdrant on the BGE-M3 embedding of the question.
 - **Sparse**: BM25 over the same chunks, using `rank-bm25` with a tokenizer that handles numeric tokens and hyphenated terms.
@@ -71,11 +71,11 @@ When `USE_PARENT_EXPAND=true` (default), a hit on a small "child" chunk pulls in
 - **Small chunks** (~256 tokens) rank well because they're focused, but they truncate the surrounding evidence.
 - **Large chunks** (~1024 tokens) carry more context but rank worse because the signal-to-noise drops.
 
-DocuMind embeds the small chunks but, on a hit, expands to the parent passage. See [`backend/retrieval/parent_expand.py`](https://github.com/dyh1265/RAG/blob/master/backend/retrieval/parent_expand.py).
+DocuMind embeds the small chunks but, on a hit, expands to the parent passage. See [`backend/retrieval/parent_expand.py`](https://github.com/dyh1265/DocuMind/blob/master/backend/retrieval/parent_expand.py).
 
 ## 5. Labeled-asset retrieval
 
-Tables and figures often have explicit labels (*Table 1*, *Figure 3*). [`backend/retrieval/asset_refs.py`](https://github.com/dyh1265/RAG/blob/master/backend/retrieval/asset_refs.py) detects these references in both the query *and* the chunk metadata, and adds them as a high-precedence path on top of the vector / BM25 / RRF stack. This means *"What does Figure 3 show?"* directly retrieves the chunk that was labeled *Figure 3* by the parser at ingest time — no embedding match required.
+Tables and figures often have explicit labels (*Table 1*, *Figure 3*). [`backend/retrieval/asset_refs.py`](https://github.com/dyh1265/DocuMind/blob/master/backend/retrieval/asset_refs.py) detects these references in both the query *and* the chunk metadata, and adds them as a high-precedence path on top of the vector / BM25 / RRF stack. This means *"What does Figure 3 show?"* directly retrieves the chunk that was labeled *Figure 3* by the parser at ingest time — no embedding match required.
 
 ## 6. Optional rerankers
 
@@ -83,8 +83,8 @@ Two rerankers are available, off by default:
 
 | Reranker | Model | Latency (CPU) | When to use |
 |---|---|---|---|
-| **Cross-encoder** ([`CrossEncoderReranker`](https://github.com/dyh1265/RAG/blob/master/backend/retrieval/cross_encoder_reranker.py)) | `BAAI/bge-reranker-v2-m3` | ~250 ms for 10 chunks | Best quality, ~10× slower than no reranker. |
-| **FlashRank** ([`FlashRankReranker`](https://github.com/dyh1265/RAG/blob/master/backend/retrieval/flashrank_reranker.py)) | ms-marco-MiniLM-L-12-v2 | ~25 ms | Solid quality, almost free latency. Set `USE_FLASHRANK=true`. |
+| **Cross-encoder** ([`CrossEncoderReranker`](https://github.com/dyh1265/DocuMind/blob/master/backend/retrieval/cross_encoder_reranker.py)) | `BAAI/bge-reranker-v2-m3` | ~250 ms for 10 chunks | Best quality, ~10× slower than no reranker. |
+| **FlashRank** ([`FlashRankReranker`](https://github.com/dyh1265/DocuMind/blob/master/backend/retrieval/flashrank_reranker.py)) | ms-marco-MiniLM-L-12-v2 | ~25 ms | Solid quality, almost free latency. Set `USE_FLASHRANK=true`. |
 
 Both shrink the retrieved-context list from `default_top_k=5` down to `reranker_top_n=3` before the LLM call, which also makes the LLM cheaper.
 
@@ -98,7 +98,7 @@ Practical notes:
 
 ## 8. Chunk filters
 
-[`backend/retrieval/chunk_filters.py`](https://github.com/dyh1265/RAG/blob/master/backend/retrieval/chunk_filters.py) runs cheap post-retrieval filters before the LLM call:
+[`backend/retrieval/chunk_filters.py`](https://github.com/dyh1265/DocuMind/blob/master/backend/retrieval/chunk_filters.py) runs cheap post-retrieval filters before the LLM call:
 
 - `is_substantive_content`: drops chunks whose visible text is whitespace, single characters, or page numbers — common artefacts from OCR on scanned PDFs.
 - Dedup by `chunk_id`: same chunk surfacing from both dense and sparse retrieval is collapsed.

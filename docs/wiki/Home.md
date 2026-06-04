@@ -2,7 +2,7 @@
 
 > Upload a PDF, chat with it, get cited answers — backed by hybrid retrieval, multimodal embeddings, and a CI-gated evaluation suite.
 
-This wiki is the long-form companion to the [project README](https://github.com/dyh1265/RAG). The README answers *"how do I run it?"*; the wiki answers *"how does it work, and why?"*.
+This wiki is the long-form companion to the [project README](https://github.com/dyh1265/DocuMind). The README answers *"how do I run it?"*; the wiki answers *"how does it work, and why?"*.
 
 ## What DocuMind is
 
@@ -37,8 +37,8 @@ It is not a toy notebook. The repo ships with:
 
 - You have plain-text knowledge-base articles — a single-collection vector index and a small RAG library are probably overkill in reverse here.
 - You need sub-100 ms p95 latency — the multimodal fusion + optional reranker stage is honest about its budget (see [Evaluation](Evaluation)).
-- You need streaming token-by-token UX — currently the generator returns the full answer (extending to streaming is straightforward; see [`backend/generation/answer_generator.py`](https://github.com/dyh1265/RAG/blob/master/backend/generation/answer_generator.py)).
+- You need streaming token-by-token UX — currently the generator returns the full answer (extending to streaming is straightforward; see [`backend/generation/answer_generator.py`](https://github.com/dyh1265/DocuMind/blob/master/backend/generation/answer_generator.py)).
 
 ## Contributing to the wiki
 
-Source lives at [`docs/wiki/`](https://github.com/dyh1265/RAG/tree/master/docs/wiki) in the main repo. Push there and the [`Wiki Sync`](https://github.com/dyh1265/RAG/actions/workflows/wiki.yml) workflow republishes this site. See [`docs/wiki/README.md`](https://github.com/dyh1265/RAG/blob/master/docs/wiki/README.md) for the publishing setup.
+Source lives at [`docs/wiki/`](https://github.com/dyh1265/DocuMind/tree/master/docs/wiki) in the main repo. Push there and the [`Wiki Sync`](https://github.com/dyh1265/DocuMind/actions/workflows/wiki.yml) workflow republishes this site. See [`docs/wiki/README.md`](https://github.com/dyh1265/DocuMind/blob/master/docs/wiki/README.md) for the publishing setup.

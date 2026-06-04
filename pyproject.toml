@@ -100,9 +100,9 @@ eval = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/dyh1265/RAG"
-Repository = "https://github.com/dyh1265/RAG"
-Issues = "https://github.com/dyh1265/RAG/issues"
+Homepage = "https://github.com/dyh1265/DocuMind"
+Repository = "https://github.com/dyh1265/DocuMind"
+Issues = "https://github.com/dyh1265/DocuMind/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

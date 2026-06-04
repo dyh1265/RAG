@@ -170,8 +170,8 @@ ssh ubuntu@YOUR_PUBLIC_IP
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
-git clone https://github.com/dyh1265/RAG.git ~/RAG   # or scp your local copy
-cd ~/RAG
+git clone https://github.com/dyh1265/DocuMind.git ~/DocuMind   # or scp your local copy
+cd ~/DocuMind
 cp deploy/.env.demo.example .env
 nano .env   # set OPENAI_API_KEY=sk-...
 ```
@@ -185,7 +185,7 @@ bash deploy/bootstrap-oracle.sh
 Or manually:
 
 ```bash
-cd ~/RAG/docker
+cd ~/DocuMind/docker
 docker compose --profile production up -d --build
 ```
 
@@ -232,7 +232,7 @@ Persist that override by exporting `DOCUMIND_WEB_PORT` in your shell profile or 
 ### 6. Operations
 
 ```bash
-cd ~/RAG/docker
+cd ~/DocuMind/docker
 
 # Logs
 docker compose logs -f rag-api documind-web
@@ -275,7 +275,7 @@ docker compose --profile production --profile dev down -v --remove-orphans
 **Oracle / VM:**
 
 ```bash
-cd ~/RAG/docker
+cd ~/DocuMind/docker
 
 docker compose --profile production down                    # stop demo, keep data
 docker compose --profile production down --remove-orphans   # drop legacy services
