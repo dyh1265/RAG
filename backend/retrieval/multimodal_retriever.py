@@ -31,6 +31,7 @@ from backend.retrieval.asset_refs import (
     parse_asset_reference,
 )
 from backend.retrieval.cross_encoder_reranker import CrossEncoderReranker
+from backend.retrieval.list_expand import expand_split_list_items
 from backend.retrieval.parent_expand import collect_parent_ids, expand_to_parents
 
 FIGURE_HINTS = ("figure", "chart", "graph", "diagram", "plot", "visual", "trend")
@@ -553,6 +554,8 @@ class MultiModalRetriever:
             results = candidates[: request.top_k]
 
         results = prefer_substantive_contexts(results, request.top_k)
+        if doc_scoped:
+            results = expand_split_list_items(self.store, doc_id, results, request.top_k)
         if asset_hits:
             results = _prepend_unique(asset_hits, results, request.top_k)
         return self._expand_parent_contexts(results)

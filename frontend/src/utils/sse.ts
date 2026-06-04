@@ -2,6 +2,31 @@
 
 export type SseHandler = (event: string, data: string) => void;
 
+function dispatchSseBlock(block: string, onEvent: SseHandler): void {
+  if (!block.trim()) return;
+  let event = "message";
+  const dataLines: string[] = [];
+  for (const line of block.split("\n")) {
+    if (line.startsWith("event:")) {
+      event = line.slice(6).trim();
+    } else if (line.startsWith("data:")) {
+      dataLines.push(line.slice(5).trimStart());
+    }
+  }
+  if (dataLines.length) {
+    onEvent(event, dataLines.join("\n"));
+  }
+}
+
+function drainSseBuffer(buffer: string, onEvent: SseHandler): string {
+  const blocks = buffer.split("\n\n");
+  const remainder = blocks.pop() ?? "";
+  for (const block of blocks) {
+    dispatchSseBlock(block, onEvent);
+  }
+  return remainder;
+}
+
 export async function readSseStream(
   response: Response,
   onEvent: SseHandler,
@@ -20,24 +45,17 @@ export async function readSseStream(
         throw new DOMException("Aborted", "AbortError");
       }
       const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const blocks = buffer.split("\n\n");
-      buffer = blocks.pop() ?? "";
-      for (const block of blocks) {
-        if (!block.trim()) continue;
-        let event = "message";
-        const dataLines: string[] = [];
-        for (const line of block.split("\n")) {
-          if (line.startsWith("event:")) {
-            event = line.slice(6).trim();
-          } else if (line.startsWith("data:")) {
-            dataLines.push(line.slice(5).trimStart());
-          }
+      if (value) {
+        buffer += decoder.decode(value, { stream: true });
+        buffer = drainSseBuffer(buffer, onEvent);
+      }
+      if (done) {
+        buffer += decoder.decode();
+        drainSseBuffer(buffer, onEvent);
+        if (buffer.trim()) {
+          dispatchSseBlock(buffer, onEvent);
         }
-        if (dataLines.length) {
-          onEvent(event, dataLines.join("\n"));
-        }
+        break;
       }
     }
   } finally {

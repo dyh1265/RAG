@@ -137,7 +137,13 @@ async def ingest_stream(
         task = asyncio.create_task(asyncio.to_thread(run_ingest))
         try:
             while True:
-                kind, payload = await queue.get()
+                try:
+                    kind, payload = await asyncio.wait_for(queue.get(), timeout=15.0)
+                except asyncio.TimeoutError:
+                    # Embedding/OCR can run minutes without progress callbacks;
+                    # keep the HTTP connection alive through nginx and browsers.
+                    yield ": keepalive\n\n"
+                    continue
                 if kind == "progress":
                     yield f"event: progress\ndata: {json.dumps(payload)}\n\n"
                 elif kind == "done":

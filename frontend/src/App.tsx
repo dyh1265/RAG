@@ -375,6 +375,11 @@ export default function App() {
       }
 
       void refreshDocuments();
+      const indexedDone = job.ingested + job.skipped;
+      const completionMessage =
+        job.failed > 0
+          ? `${indexedDone} of ${job.total} ready · ${job.failed} failed`
+          : `${indexedDone} of ${job.total} ready to chat`;
       setFolderProgress({
         status: job.status === "error" ? "error" : "done",
         source: "local",
@@ -384,9 +389,7 @@ export default function App() {
         ingested: job.ingested,
         skipped: job.skipped,
         failed: job.failed,
-        message:
-          job.message ??
-          `${job.ingested} ingested · ${job.skipped} skipped · ${job.failed} failed`,
+        message: completionMessage,
       });
       if (job.status === "error") {
         setError(job.message ?? "Bulk ingest failed");

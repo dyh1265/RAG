@@ -15,9 +15,10 @@ from backend.core.models import Citation, QueryResponse, RetrievedContext
 
 _SYSTEM_PROMPT = (
     "You are a precise document QA assistant. Answer ONLY using the numbered "
-    "context passages below. If the context lists items (practices, steps, "
-    "principles, etc.), include the full list in your answer. "
-    "If the context is insufficient, say so. "
+    "context passages below. If the context lists items (views, practices, steps, "
+    "principles, patterns, etc.), include every listed item in your answer — "
+    "items may appear across multiple passages. Do not omit list entries that "
+    "appear in the context. If the context is insufficient, say so. "
     "Cite sources inline as [1], [2], etc."
 )
 

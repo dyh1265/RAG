@@ -480,12 +480,35 @@ body {
   color: #6ee7b7;
 }
 
+.folder-load-stats .stat-detail {
+  color: var(--sidebar-muted);
+  font-weight: 400;
+}
+
 .folder-load-stats .stat-skipped {
   color: var(--sidebar-muted);
 }
 
 .folder-load-stats .stat-failed {
   color: #fca5a5;
+}
+
+.folder-load-status.status-empty {
+  border-color: #f59e0b;
+  background: #3b2308;
+}
+
+.folder-load-summary {
+  margin: 0.45rem 0 0;
+  font-size: 0.85rem;
+  color: var(--sidebar-fg);
+}
+
+.folder-load-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: var(--sidebar-muted);
+  line-height: 1.35;
 }
 
 .folder-load-message {

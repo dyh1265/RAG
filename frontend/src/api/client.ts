@@ -150,7 +150,13 @@ export class RagApiClient {
     );
 
     if (streamError) throw new Error(streamError);
-    if (!result) throw new Error("Ingest finished without a result");
+    if (!result) {
+      throw new Error(
+        "Ingest finished without a result. The connection may have closed during " +
+          "embedding (this can take several minutes on CPU). Check Recent documents " +
+          "for the file, or upload again.",
+      );
+    }
     return result;
   }
 
