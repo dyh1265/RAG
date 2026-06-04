@@ -13,8 +13,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-IngestProgressFn = Callable[[str, str, dict[str, Any] | None], None]
-
 from backend.core.config import get_settings
 from backend.core.models import QueryRequest, QueryResponse, RetrievedContext
 from backend.ingestion.embeddings.colpali_embedder import ColPaliEmbedder
@@ -33,6 +31,8 @@ from backend.retrieval.preprocessing import (
     invalidate_retrieval_caches,
 )
 from backend.scaling.pipeline.ingest_modes import IngestMode, build_ingestion_pipeline
+
+IngestProgressFn = Callable[[str, str, dict[str, Any] | None], None]
 
 
 @dataclass
