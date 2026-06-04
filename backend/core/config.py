@@ -110,6 +110,22 @@ class Settings(BaseSettings):
     use_pii_redaction_on_ingest: bool = Field(default=True, alias="USE_PII_REDACTION_ON_INGEST")
     api_warmup_models: bool = Field(default=True, alias="API_WARMUP_MODELS")
 
+    # --- Sessions (per-user document isolation) ---
+    session_secret: str = Field(
+        default="documind-dev-secret-change-me",
+        alias="SESSION_SECRET",
+        description=(
+            "HMAC secret used to sign anonymous session tokens that scope each "
+            "browser's documents. MUST be overridden with a long random value in "
+            "any shared/public deployment, otherwise tokens can be forged."
+        ),
+    )
+    session_max_age_seconds: int = Field(
+        default=86400 * 30,
+        alias="SESSION_MAX_AGE_SECONDS",
+        description="Lifetime of a signed session token in seconds (0 disables expiry).",
+    )
+
     @property
     def cors_allow_origins_list(self) -> list[str]:
         """Parse ``CORS_ALLOW_ORIGINS`` into a list. Empty input falls back to ``['*']``."""

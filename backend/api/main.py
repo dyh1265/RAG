@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from backend.api.rate_limit import limiter
-from backend.api.routers import admin, bulk_ingest, health, ingest, query
+from backend.api.routers import admin, bulk_ingest, health, ingest, query, session
 from backend.api.monitoring.tracing import setup_tracing
 from backend.core.config import get_settings
 from backend.core.pipeline import PipelineConfig, RAGPipeline
@@ -79,6 +79,7 @@ app.add_middleware(
 setup_tracing(app, get_settings())
 
 app.include_router(health.router, tags=["Health"])
+app.include_router(session.router, prefix="/session", tags=["Session"])
 app.include_router(query.router, prefix="/query", tags=["Query"])
 app.include_router(ingest.router, prefix="/ingest", tags=["Ingest"])
 app.include_router(bulk_ingest.router, prefix="/ingest", tags=["Ingest"])

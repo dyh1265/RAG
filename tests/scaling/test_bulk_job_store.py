@@ -21,6 +21,13 @@ def job_store():
     return store
 
 
+def test_create_defaults_tenant_to_public(job_store: BulkJobStore):
+    job_store.create("job0", folder_name="Default", total=1)
+    job = job_store.get("job0")
+    assert job is not None
+    assert job.tenant_id == "public"
+
+
 def test_bulk_job_lifecycle(job_store: BulkJobStore):
     job_store.create("job1", folder_name="PhD", total=2)
     job_store.add_uploaded_path("job1", "/data/a.pdf", "a.pdf")

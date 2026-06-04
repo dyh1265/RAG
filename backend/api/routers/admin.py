@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 
-from backend.api.dependencies import get_app_settings, get_pipeline
+from backend.api.dependencies import get_app_settings, get_pipeline, get_tenant_id
 from backend.api.schemas import (
     CollectionStatsOut,
     DirectoryBrowseOut,
@@ -35,10 +35,11 @@ def _display_name(source_path: str, doc_id: str) -> str:
 @router.get("/documents", response_model=list[DocumentSummaryOut])
 async def list_documents(
     pipeline: RAGPipeline = Depends(get_pipeline),
+    tenant_id: str = Depends(get_tenant_id),
     limit: int = 100,
 ) -> list[DocumentSummaryOut]:
     def _list() -> list[DocumentSummaryOut]:
-        rows = pipeline.store.list_documents(limit=limit)
+        rows = pipeline.store.list_documents(limit=limit, tenant_id=tenant_id)
         return [
             DocumentSummaryOut(
                 doc_id=row["doc_id"],
@@ -56,11 +57,14 @@ async def list_documents(
 async def document_suggestions(
     doc_id: str,
     pipeline: RAGPipeline = Depends(get_pipeline),
+    tenant_id: str = Depends(get_tenant_id),
 ) -> DocumentSuggestionsOut:
     if not doc_id.strip():
         raise HTTPException(status_code=400, detail="doc_id is required")
 
-    source_path = await asyncio.to_thread(pipeline.store.get_document_source_path, doc_id)
+    source_path = await asyncio.to_thread(
+        pipeline.store.get_document_source_path, doc_id, tenant_id=tenant_id
+    )
     if not source_path:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -70,7 +74,7 @@ async def document_suggestions(
             chunks.extend(
                 pipeline.store.scroll_collection(
                     collection_name,
-                    filters={"doc_id": doc_id},
+                    filters={"doc_id": doc_id, "tenant_id": tenant_id},
                     limit=40,
                 )
             )
@@ -105,12 +109,13 @@ async def get_document_file(
     doc_id: str,
     pipeline: RAGPipeline = Depends(get_pipeline),
     settings: Settings = Depends(get_app_settings),
+    tenant_id: str = Depends(get_tenant_id),
 ) -> FileResponse:
     if not doc_id.strip():
         raise HTTPException(status_code=400, detail="doc_id is required")
 
     def _resolve() -> Path | None:
-        source_path = pipeline.store.get_document_source_path(doc_id)
+        source_path = pipeline.store.get_document_source_path(doc_id, tenant_id=tenant_id)
         if not source_path:
             return None
         try:
@@ -189,9 +194,13 @@ async def list_collections(pipeline: RAGPipeline = Depends(get_pipeline)) -> lis
 
 
 @router.delete("/doc/{doc_id}")
-async def delete_document(doc_id: str, pipeline: RAGPipeline = Depends(get_pipeline)) -> dict:
+async def delete_document(
+    doc_id: str,
+    pipeline: RAGPipeline = Depends(get_pipeline),
+    tenant_id: str = Depends(get_tenant_id),
+) -> dict:
     if not doc_id.strip():
         raise HTTPException(status_code=400, detail="doc_id is required")
 
-    await asyncio.to_thread(pipeline.store.delete_doc, doc_id)
+    await asyncio.to_thread(pipeline.store.delete_doc, doc_id, tenant_id=tenant_id)
     return {"deleted": doc_id}

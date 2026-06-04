@@ -19,6 +19,7 @@ class BulkJobStatus:
     folder_name: str
     status: str  # uploading | queued | running | done | error
     total: int
+    tenant_id: str = "public"
     uploaded: int = 0
     processed: int = 0
     ingested: int = 0
@@ -64,8 +65,21 @@ class BulkJobStore:
     def _key(self, job_id: str) -> str:
         return f"{JOB_PREFIX}{job_id}"
 
-    def create(self, job_id: str, *, folder_name: str, total: int) -> BulkJobStatus:
-        job = BulkJobStatus(job_id=job_id, folder_name=folder_name, status="uploading", total=total)
+    def create(
+        self,
+        job_id: str,
+        *,
+        folder_name: str,
+        total: int,
+        tenant_id: str = "public",
+    ) -> BulkJobStatus:
+        job = BulkJobStatus(
+            job_id=job_id,
+            folder_name=folder_name,
+            status="uploading",
+            total=total,
+            tenant_id=tenant_id,
+        )
         self._save(job)
         return job
 

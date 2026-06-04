@@ -41,11 +41,13 @@ def scalable_ingest(
     path: str | Path,
     *,
     config: ScalableIngestConfig | None = None,
+    tenant_id: str = "public",
 ) -> IngestResult:
     """
     Parse, optionally dedup, cache-aware embed, and upsert into Qdrant.
 
     Skips re-ingest when the document fingerprint is unchanged (Redis meta).
+    ``tenant_id`` scopes the stored vectors to the user who started the job.
     """
     cfg = config or ScalableIngestConfig()
     pdf_path = Path(path)
@@ -104,7 +106,7 @@ def scalable_ingest(
         )
 
     try:
-        pipeline.store.delete_doc(doc_id)
+        pipeline.store.delete_doc(doc_id, tenant_id=tenant_id)
         invalidate_retrieval_caches(doc_id)
         embedded, embed_stats = embed_chunks_cached(
             chunks,
@@ -114,7 +116,7 @@ def scalable_ingest(
             use_colpali=pipeline.config.use_colpali,
             cache=cache,
         )
-        pipeline.store.upsert(embedded)
+        pipeline.store.upsert(embedded, tenant_id=tenant_id)
     except Exception:
         QDRANT_ERRORS.inc()
         record_ingest_failure()

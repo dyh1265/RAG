@@ -13,6 +13,7 @@ import type {
   ReadyResponse,
 } from "../types";
 import { parseApiErrorBody } from "../utils/apiErrors";
+import { authHeaders, getStoredToken } from "../storage/session";
 import { readSseStream } from "../utils/sse";
 
 const STORAGE_KEY = "documind.apiUrl";
@@ -72,7 +73,13 @@ export function saveApiBase(url: string): void {
 
 export function documentPreviewUrl(apiBase: string, docId: string): string {
   const base = apiBase.replace(/\/$/, "");
-  return `${base}/admin/documents/${encodeURIComponent(docId)}/file`;
+  const path = `${base}/admin/documents/${encodeURIComponent(docId)}/file`;
+  // The preview is loaded by the browser as an <iframe src> / <a href>, which
+  // cannot send the Authorization header — pass the signed token as a query
+  // param so the backend can still scope the file lookup to this user. The
+  // token always exists by the time a document is previewable.
+  const token = getStoredToken();
+  return token ? `${path}?t=${encodeURIComponent(token)}` : path;
 }
 
 export class RagApiClient {
@@ -82,6 +89,11 @@ export class RagApiClient {
 
   private url(path: string): string {
     return `${this.baseUrl.replace(/\/$/, "")}${path}`;
+  }
+
+  /** Headers carrying this browser's signed session token (minted on demand). */
+  private authHeaders(extra?: HeadersInit): Promise<HeadersInit> {
+    return authHeaders(this.baseUrl, extra);
   }
 
   async health(signal?: AbortSignal): Promise<HealthResponse> {
@@ -109,6 +121,7 @@ export class RagApiClient {
     form.append("file", file, file.name);
     const res = await fetch(this.url("/ingest"), {
       method: "POST",
+      headers: await this.authHeaders(),
       body: form,
       signal,
     });
@@ -126,6 +139,7 @@ export class RagApiClient {
     form.append("file", file, file.name);
     const res = await fetch(this.url("/ingest/stream"), {
       method: "POST",
+      headers: await this.authHeaders(),
       body: form,
       signal,
     });
@@ -167,7 +181,7 @@ export class RagApiClient {
   ): Promise<BulkIngestStartResponse> {
     const res = await fetch(this.url("/ingest/bulk/start"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await this.authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ folder_name: folderName, total_files: totalFiles }),
       signal,
     });
@@ -184,6 +198,7 @@ export class RagApiClient {
     form.append("file", file, file.name);
     const res = await fetch(this.url(`/ingest/bulk/${jobId}/files`), {
       method: "POST",
+      headers: await this.authHeaders(),
       body: form,
       signal,
     });
@@ -194,6 +209,7 @@ export class RagApiClient {
   async bulkIngestRun(jobId: string, signal?: AbortSignal): Promise<{ queued: number }> {
     const res = await fetch(this.url(`/ingest/bulk/${jobId}/run`), {
       method: "POST",
+      headers: await this.authHeaders(),
       signal,
     });
     if (!res.ok) await throwApiError(res, "Bulk ingest queue failed");
@@ -203,6 +219,7 @@ export class RagApiClient {
   async bulkIngestResume(jobId: string, signal?: AbortSignal): Promise<{ queued: number }> {
     const res = await fetch(this.url(`/ingest/bulk/${jobId}/resume`), {
       method: "POST",
+      headers: await this.authHeaders(),
       signal,
     });
     if (!res.ok) await throwApiError(res, "Bulk ingest resume failed");
@@ -210,13 +227,19 @@ export class RagApiClient {
   }
 
   async getBulkIngestJob(jobId: string, signal?: AbortSignal): Promise<BulkIngestJob> {
-    const res = await fetch(this.url(`/ingest/bulk/${jobId}`), { signal });
+    const res = await fetch(this.url(`/ingest/bulk/${jobId}`), {
+      headers: await this.authHeaders(),
+      signal,
+    });
     if (!res.ok) await throwApiError(res, "Bulk job status failed");
     return res.json();
   }
 
   async listDocuments(signal?: AbortSignal): Promise<DocumentSummary[]> {
-    const res = await fetch(this.url("/admin/documents"), { signal });
+    const res = await fetch(this.url("/admin/documents"), {
+      headers: await this.authHeaders(),
+      signal,
+    });
     if (!res.ok) await throwApiError(res, "Failed to list documents");
     return res.json();
   }
@@ -227,7 +250,7 @@ export class RagApiClient {
   ): Promise<DocumentSuggestions> {
     const res = await fetch(
       this.url(`/admin/documents/${encodeURIComponent(docId)}/suggestions`),
-      { signal },
+      { headers: await this.authHeaders(), signal },
     );
     if (!res.ok) await throwApiError(res, "Failed to load suggestions");
     return res.json();
@@ -235,7 +258,10 @@ export class RagApiClient {
 
   async browseDirectories(path?: string, signal?: AbortSignal): Promise<DirectoryBrowseResponse> {
     const query = path ? `?path=${encodeURIComponent(path)}` : "";
-    const res = await fetch(this.url(`/admin/directories${query}`), { signal });
+    const res = await fetch(this.url(`/admin/directories${query}`), {
+      headers: await this.authHeaders(),
+      signal,
+    });
     if (!res.ok) await throwApiError(res, "Failed to browse directories");
     return res.json();
   }
@@ -243,6 +269,7 @@ export class RagApiClient {
   async deleteDocument(docId: string, signal?: AbortSignal): Promise<void> {
     const res = await fetch(this.url(`/admin/doc/${encodeURIComponent(docId)}`), {
       method: "DELETE",
+      headers: await this.authHeaders(),
       signal,
     });
     if (!res.ok) await throwApiError(res, "Failed to delete document");
@@ -255,7 +282,7 @@ export class RagApiClient {
   ): Promise<DirectoryIngestResponse> {
     const res = await fetch(this.url("/ingest/directory"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await this.authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         directory,
         recursive: options?.recursive ?? true,
@@ -278,7 +305,7 @@ export class RagApiClient {
   ): Promise<QueryResponse> {
     const res = await fetch(this.url("/query"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await this.authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         top_k: 8,
         provider: "openai",

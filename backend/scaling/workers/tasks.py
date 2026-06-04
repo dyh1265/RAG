@@ -61,8 +61,9 @@ def ingest_document(self, path: str, options: dict | None = None, job_id: str | 
         force=opts.get("force", False),
     )
 
+    tenant_id = opts.get("tenant_id", "public")
     try:
-        result = scalable_ingest(pipeline, pdf_path, config=cfg)
+        result = scalable_ingest(pipeline, pdf_path, config=cfg, tenant_id=tenant_id)
     except Exception as exc:
         raise self.retry(exc=exc) from exc
 

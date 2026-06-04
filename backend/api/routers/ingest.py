@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
-from backend.api.dependencies import get_app_settings, get_pipeline
+from backend.api.dependencies import get_app_settings, get_pipeline, get_tenant_id
 from backend.api.rate_limit import limiter, rate_limit
 from backend.api.schemas import DirectoryIngestBody, DirectoryIngestOut, IngestResponseOut
 from backend.api.monitoring.metrics import INGEST_REQUESTS
@@ -89,10 +89,13 @@ async def ingest_upload(
     file: UploadFile = File(...),
     pipeline: RAGPipeline = Depends(get_pipeline),
     settings: Settings = Depends(get_app_settings),
+    tenant_id: str = Depends(get_tenant_id),
 ) -> IngestResponseOut:
     INGEST_REQUESTS.inc()
     dest, _ = await _save_upload(file, settings)
-    result = await asyncio.to_thread(pipeline.ingest, dest)
+    result = await asyncio.to_thread(
+        lambda: pipeline.ingest(dest, tenant_id=tenant_id)
+    )
     return _to_ingest_out(result)
 
 
@@ -103,6 +106,7 @@ async def ingest_stream(
     file: UploadFile = File(...),
     pipeline: RAGPipeline = Depends(get_pipeline),
     settings: Settings = Depends(get_app_settings),
+    tenant_id: str = Depends(get_tenant_id),
 ) -> StreamingResponse:
     """SSE ingest with live progress (stage + message + optional detail)."""
     INGEST_REQUESTS.inc()
@@ -121,7 +125,9 @@ async def ingest_stream(
 
         def run_ingest() -> None:
             try:
-                result = pipeline.ingest(dest, on_progress=on_progress)
+                result = pipeline.ingest(
+                    dest, on_progress=on_progress, tenant_id=tenant_id
+                )
                 loop.call_soon_threadsafe(
                     queue.put_nowait,
                     ("done", _to_ingest_out(result).model_dump(mode="json")),

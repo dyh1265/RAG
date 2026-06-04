@@ -183,6 +183,8 @@ All backend settings live in [`backend/core/config.py`](backend/core/config.py) 
 | `USE_OCR` | `true` | Tesseract OCR for image-only PDF pages |
 | `API_WARMUP_MODELS` | `true` | Eager model load on boot (slower start, faster first query) |
 | `CORS_ALLOW_ORIGINS` | `*` | Comma-separated allowed origins. Use `*` for local/demo; set explicit origins in production. |
+| `SESSION_SECRET` | _dev default_ | HMAC secret that signs anonymous session tokens isolating each browser's documents. **Set a long random value for any shared/public demo** — the default lets tokens be forged. |
+| `SESSION_MAX_AGE_SECONDS` | `2592000` | Lifetime of a session token (30 days; `0` disables expiry). |
 
 ## Benchmarks
 

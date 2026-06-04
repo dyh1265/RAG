@@ -9,7 +9,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from backend.api.dependencies import get_pipeline
+from backend.api.dependencies import get_pipeline, get_tenant_id
 from backend.api.rate_limit import limiter, rate_limit
 from backend.api.schemas import QueryBody, QueryResponseOut
 from backend.api.guardrails.pii import PIIRedactor
@@ -25,13 +25,16 @@ def _run_query(
     body: QueryBody,
     *,
     block_forbidden: bool | None,
+    tenant_id: str,
 ) -> tuple[QueryResponseOut, bool]:
     redactor = PIIRedactor()
     query_text, query_redacted = redactor.redact(body.query)
     if query_redacted:
         PII_REDACTIONS.inc()
 
-    filters = {"doc_id": body.doc_id} if body.doc_id else {}
+    filters: dict[str, str] = {"tenant_id": tenant_id}
+    if body.doc_id:
+        filters["doc_id"] = body.doc_id
     request = QueryRequest(query=query_text, top_k=body.top_k, filters=filters)
 
     if block_forbidden is not None:
@@ -57,6 +60,7 @@ async def query_json(
     request: Request,
     body: QueryBody,
     pipeline: RAGPipeline = Depends(get_pipeline),
+    tenant_id: str = Depends(get_tenant_id),
 ) -> QueryResponseOut:
     QUERY_REQUESTS.labels(provider=body.provider, retrieve_only=str(body.retrieve_only)).inc()
     t0 = time.perf_counter()
@@ -66,6 +70,7 @@ async def query_json(
             pipeline,
             body,
             block_forbidden=body.block_forbidden,
+            tenant_id=tenant_id,
         )
         return out
     except ValueError as exc:
@@ -90,6 +95,7 @@ async def query_stream(
     request: Request,
     body: QueryBody,
     pipeline: RAGPipeline = Depends(get_pipeline),
+    tenant_id: str = Depends(get_tenant_id),
 ) -> StreamingResponse:
     QUERY_REQUESTS.labels(provider=body.provider, retrieve_only=str(body.retrieve_only)).inc()
 
@@ -101,6 +107,7 @@ async def query_stream(
             pipeline,
             body,
             block_forbidden=body.block_forbidden,
+            tenant_id=tenant_id,
         )
         QUERY_LATENCY.observe(time.perf_counter() - t0)
         payload = out.model_dump(mode="json")

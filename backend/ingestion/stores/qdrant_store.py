@@ -114,8 +114,17 @@ class QdrantStore:
             vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
         )
 
-    def upsert(self, embedded_chunks: list[EmbeddedChunk]) -> None:
-        """Upsert a batch of embedded chunks into the appropriate collection."""
+    def upsert(
+        self,
+        embedded_chunks: list[EmbeddedChunk],
+        *,
+        tenant_id: str = "public",
+    ) -> None:
+        """Upsert a batch of embedded chunks into the appropriate collection.
+
+        ``tenant_id`` is stamped into every point's payload so retrieval and
+        document listing can be scoped per user (see ``QueryRequest.filters``).
+        """
         from qdrant_client.models import PointStruct
 
         # Group by collection
@@ -136,6 +145,7 @@ class QdrantStore:
                     vector=ec.vector,
                     payload={
                         "doc_id": ec.chunk.doc_id,
+                        "tenant_id": tenant_id,
                         "source_path": ec.chunk.source_path,
                         "chunk_type": ec.chunk.chunk_type.value,
                         "content": ec.chunk.content,
@@ -156,22 +166,38 @@ class QdrantStore:
                     )
                 )
 
-    def delete_doc(self, doc_id: str) -> None:
-        """Remove all vectors for a document across every chunk collection."""
+    def delete_doc(self, doc_id: str, *, tenant_id: str | None = None) -> None:
+        """Remove all vectors for a document across every chunk collection.
+
+        When ``tenant_id`` is given the deletion is scoped to that tenant so a
+        caller can never drop another user's document by guessing its id.
+        """
         from qdrant_client.models import FieldCondition, Filter, FilterSelector, MatchValue
 
-        selector = FilterSelector(
-            filter=Filter(
-                must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
+        conditions = [FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
+        if tenant_id is not None:
+            conditions.append(
+                FieldCondition(key="tenant_id", match=MatchValue(value=tenant_id))
             )
-        )
+        selector = FilterSelector(filter=Filter(must=conditions))
         existing = {c.name for c in self.client.get_collections().collections}
         for collection_name in set(COLLECTION_MAP.values()):
             if collection_name in existing:
                 self.client.delete(collection_name=collection_name, points_selector=selector)
 
-    def list_documents(self, *, limit: int = 100) -> list[dict]:
-        """Aggregate indexed documents by doc_id across all chunk collections."""
+    def list_documents(self, *, limit: int = 100, tenant_id: str | None = None) -> list[dict]:
+        """Aggregate indexed documents by doc_id across all chunk collections.
+
+        Pass ``tenant_id`` to only return documents owned by that tenant.
+        """
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        scroll_filter = None
+        if tenant_id is not None:
+            scroll_filter = Filter(
+                must=[FieldCondition(key="tenant_id", match=MatchValue(value=tenant_id))]
+            )
+
         docs: dict[str, dict] = {}
         existing = {c.name for c in self.client.get_collections().collections}
         for collection_name in set(COLLECTION_MAP.values()):
@@ -181,6 +207,7 @@ class QdrantStore:
             while True:
                 records, offset = self.client.scroll(
                     collection_name=collection_name,
+                    scroll_filter=scroll_filter,
                     limit=256,
                     offset=offset,
                     with_payload=["doc_id", "source_path"],
@@ -204,19 +231,27 @@ class QdrantStore:
                     break
         return sorted(docs.values(), key=lambda d: d["doc_id"])[:limit]
 
-    def get_document_source_path(self, doc_id: str) -> str | None:
-        """Return source_path for doc_id from any chunk collection."""
+    def get_document_source_path(
+        self, doc_id: str, *, tenant_id: str | None = None
+    ) -> str | None:
+        """Return source_path for doc_id from any chunk collection.
+
+        Pass ``tenant_id`` to only resolve documents owned by that tenant.
+        """
         from qdrant_client.models import FieldCondition, Filter, MatchValue
 
+        conditions = [FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
+        if tenant_id is not None:
+            conditions.append(
+                FieldCondition(key="tenant_id", match=MatchValue(value=tenant_id))
+            )
         existing = {c.name for c in self.client.get_collections().collections}
         for collection_name in set(COLLECTION_MAP.values()):
             if collection_name not in existing:
                 continue
             records, _ = self.client.scroll(
                 collection_name=collection_name,
-                scroll_filter=Filter(
-                    must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
-                ),
+                scroll_filter=Filter(must=conditions),
                 limit=1,
                 with_payload=["source_path"],
                 with_vectors=False,

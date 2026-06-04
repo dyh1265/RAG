@@ -201,8 +201,13 @@ class RAGPipeline:
         path: str | Path,
         *,
         on_progress: IngestProgressFn | None = None,
+        tenant_id: str = "public",
     ) -> IngestResult:
-        """Parse a document, embed chunks, and upsert into Qdrant."""
+        """Parse a document, embed chunks, and upsert into Qdrant.
+
+        ``tenant_id`` scopes the stored vectors to a single user so that
+        listing and retrieval can isolate one caller's documents from another's.
+        """
         pdf_path = Path(path)
         self._emit_progress(on_progress, "parsing", "Reading PDF pages…")
 
@@ -281,7 +286,7 @@ class RAGPipeline:
         )
 
         self._emit_progress(on_progress, "indexing", "Writing vectors to Qdrant…")
-        self.store.upsert(embedded)
+        self.store.upsert(embedded, tenant_id=tenant_id)
 
         vectors_by_collection: dict[str, int] = {}
         for ec in embedded:

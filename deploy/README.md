@@ -251,6 +251,7 @@ docker compose --profile production down
 - Do **not** open ports 6333, 6379, or 8002 in Oracle ingress.
 - Rotate `OPENAI_API_KEY` if the demo is abused; set Oracle billing alerts.
 - PII redaction is on by default in production compose.
+- **Set `SESSION_SECRET`** to a long random value (e.g. `openssl rand -hex 32`). Each browser gets an isolated, signed session so visitors only see their own uploads; the built-in dev secret lets those tokens be forged.
 
 ### 7. Teardown / cleanup
 
