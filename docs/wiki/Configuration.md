@@ -68,6 +68,15 @@ All defaults are tuned for the in-tree sample report and the CI golden set. See 
 | *(code-only)* `chunk_overlap` | `64` tokens | Chunker overlap. |
 | *(code-only)* `max_workers` | `4` | Async ingestion workers. |
 
+## Sessions (per-browser isolation)
+
+For shared demos (Cloudflare Tunnel, classroom kiosk, etc.), each browser gets a signed token that scopes its uploads and queries. Full flow, security notes, and the `public` tenant for CLI/eval are on [Sessions](Sessions).
+
+| Env var | Default | What |
+|---|---|---|
+| `SESSION_SECRET` | `documind-dev-secret-change-me` | HMAC secret for signing anonymous session tokens. **Set a long random value** on any public deployment — the default allows forged tokens. |
+| `SESSION_MAX_AGE_SECONDS` | `2592000` (30 days) | Token lifetime from issued-at (`0` = never expire). |
+
 ## API & guardrails
 
 | Env var | Default | What |

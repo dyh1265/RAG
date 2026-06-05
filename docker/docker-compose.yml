@@ -122,6 +122,7 @@ services:
       - ../data:/app/data
       - ../backend:/app/backend
       - ../scripts:/app/scripts
+      - ../docs:/app/docs
       - huggingface_cache:/root/.cache/huggingface
     depends_on:
       qdrant:

@@ -21,6 +21,10 @@ import fitz
 
 OUTPUT_PATH = Path("docs/documind-book.pdf")
 
+# Cover/footer month-year and PDF metadata default (2026-06-01 UTC).
+# Override with SOURCE_DATE_EPOCH like other generated artefacts.
+BOOK_SOURCE_DATE_EPOCH = 1780272000
+
 # ---- Page geometry (A4, 72 DPI) -------------------------------------------------
 PAGE_W, PAGE_H = 595.28, 841.89
 MARGIN_L = 72
@@ -62,7 +66,7 @@ C_NOTE_LABEL = (0.60, 0.40, 0.00)
 
 def _epoch_to_datetime() -> datetime:
     """Pin every timestamp leak so the PDF is byte-reproducible."""
-    epoch = int(os.environ.get("SOURCE_DATE_EPOCH", "1704067200"))
+    epoch = int(os.environ.get("SOURCE_DATE_EPOCH", str(BOOK_SOURCE_DATE_EPOCH)))
     return datetime.fromtimestamp(epoch, tz=timezone.utc)
 
 
@@ -630,13 +634,13 @@ def build_book() -> BookBuilder:
     b.para(
         "On the first day you can stitch together a vector store, a chunker, "
         "an embedding model, and a chat completion call, and get an answer. "
-        "On the second day the questions arrive: how do you tell whether the "
-        "answer is right? how do you keep it right when you change the "
-        "chunker? what happens when the PDF has a 14-column table? what does "
-        "the user see when the LLM is unreachable? where do PII redactions "
-        "happen, and at which stage? what gets cached, and what doesn't? how "
+        "On the second day the questions arrive: How do you tell whether the "
+        "answer is right? How do you keep it right when you change the "
+        "chunker? What happens when the PDF has a 14-column table? What does "
+        "the user see when the LLM is unreachable? Where do PII redactions "
+        "happen, and at which stage? What gets cached, and what doesn't? How "
         "do you make ingest of a large folder of PDFs not block the chat UI? "
-        "what does the latency budget look like end-to-end, and which knob "
+        "What does the latency budget look like end-to-end, and which knob "
         "buys you the most quality per millisecond?"
     )
     b.para(
@@ -1710,7 +1714,7 @@ def build_book() -> BookBuilder:
 
     b.section("Reproducible builds")
     b.kv_table([
-        ("SOURCE_DATE_EPOCH", "Default 1704067200 (2024-01-01 UTC). Pins every wall-clock leak in generated artefacts (sample PDF, this book, eval reports) so re-runs produce byte-identical outputs."),
+        ("SOURCE_DATE_EPOCH", "Pins wall-clock leaks (PDF dates, PNG tEXt, PyMuPDF /ID). Sample report and CI default 1704067200 (2024-01-01 UTC); this book defaults to 1780272000 (2026-06-01 UTC) unless the env var is set."),
     ])
 
     # =========================================================================

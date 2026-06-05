@@ -14,6 +14,7 @@ That gets us three things vanilla wikis don't:
 |---|---|
 | `Home.md` | https://github.com/dyh1265/DocuMind/wiki/Home |
 | `Architecture.md` | https://github.com/dyh1265/DocuMind/wiki/Architecture |
+| `Sessions.md` | https://github.com/dyh1265/DocuMind/wiki/Sessions |
 | `RAG-Pipeline.md` | https://github.com/dyh1265/DocuMind/wiki/RAG-Pipeline |
 | `Retrieval.md` | https://github.com/dyh1265/DocuMind/wiki/Retrieval |
 | `Evaluation.md` | https://github.com/dyh1265/DocuMind/wiki/Evaluation |

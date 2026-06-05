@@ -2,6 +2,7 @@
 
 - [Home](Home)
 - [Architecture](Architecture)
+- [Sessions](Sessions)
 - [RAG Pipeline](RAG-Pipeline)
 - [Retrieval](Retrieval)
 - [Evaluation](Evaluation)

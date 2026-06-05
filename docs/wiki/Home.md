@@ -21,6 +21,7 @@ It is not a toy notebook. The repo ships with:
 | Page | Read when you want to |
 |---|---|
 | [Architecture](Architecture) | Understand the service topology and how requests flow end-to-end. |
+| [Sessions](Sessions) | Per-browser document isolation on a shared demo URL (signed tokens, `tenant_id`, no accounts). |
 | [RAG Pipeline](RAG-Pipeline) | Walk the ingest and query stages: parse → enrich → embed → store → retrieve → answer. |
 | [Retrieval](Retrieval) | Go deep on hybrid (BM25 + dense), multimodal fusion (text/tables/figures/pages), parent expansion, and rerankers. |
 | [Evaluation](Evaluation) | Understand the golden set, metric definitions, and how CI gates regressions. |

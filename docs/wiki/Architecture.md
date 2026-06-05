@@ -26,7 +26,7 @@ flowchart LR
 | Component | Path | Responsibility |
 |---|---|---|
 | **Frontend** | [`frontend/`](https://github.com/dyh1265/DocuMind/tree/master/frontend) | Chat UI, citation rendering, document preview, bulk upload progress. Vite dev or nginx in prod. |
-| **API** | [`backend/api/`](https://github.com/dyh1265/DocuMind/tree/master/backend/api) | FastAPI routers (`query`, `ingest`, `bulk_ingest`, `admin`, `health`), rate limiting (`slowapi`), PII guardrails, CORS, OTLP. |
+| **API** | [`backend/api/`](https://github.com/dyh1265/DocuMind/tree/master/backend/api) | FastAPI routers (`query`, `ingest`, `bulk_ingest`, `admin`, `session`, `health`), signed per-browser sessions, rate limiting (`slowapi`), PII guardrails, CORS, OTLP. |
 | **Pipeline** | [`backend/core/pipeline.py`](https://github.com/dyh1265/DocuMind/blob/master/backend/core/pipeline.py) | Single `RAGPipeline` entry point. The API, eval suite, and worker all go through it instead of wiring components by hand. |
 | **Ingestion** | [`backend/ingestion/`](https://github.com/dyh1265/DocuMind/tree/master/backend/ingestion) | PDF/table/figure parsers, OCR (Tesseract via `pytesseract`), text + image + ColPali embedders, Qdrant store. |
 | **Retrieval** | [`backend/retrieval/`](https://github.com/dyh1265/DocuMind/tree/master/backend/retrieval) | Hybrid BM25 + dense, multimodal RRF fusion, parent-chunk expansion, cross-encoder + FlashRank rerankers, chunk filters. |
@@ -37,9 +37,13 @@ flowchart LR
 | **Queue + cache** | Redis | Celery broker for bulk jobs, embed cache keyed on chunk fingerprint. |
 | **Observability** | Prometheus, Grafana, Jaeger | `/metrics` scrape, dashboards, OTLP traces for ingest + retrieval. |
 
+## Sessions on a shared URL
+
+When several people hit the same deployment (tunnel, LAN, classroom), they must not see each other's documents. The frontend mints a token via `POST /api/session`, stores it in `localStorage`, and sends `Authorization: Bearer …` on API calls (plus `?t=` for PDF iframe previews). The API resolves a **tenant id** from the token and stamps or filters every Qdrant payload accordingly. There is no login — see [Sessions](Sessions) for token format, the `public` tenant used by CLI/eval, and why `SESSION_SECRET` must be rotated on public demos.
+
 ## Request flow: a single-question query
 
-1. Browser → `POST /api/query` (FastAPI, rate-limited by `slowapi`).
+1. Browser → `POST /api/query` with the session bearer token (FastAPI, rate-limited by `slowapi`).
 2. The router validates the `QueryRequest`, runs PII redaction on the query if enabled.
 3. `RAGPipeline.query(...)` runs the full multimodal retrieval (see [Retrieval](Retrieval)).
 4. `AnswerGenerator` builds the cited prompt and calls OpenAI or Ollama.
