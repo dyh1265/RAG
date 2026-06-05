@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     ingest_metrics_port: int = Field(default=9100, alias="INGEST_METRICS_PORT")
     dedup_similarity_threshold: float = Field(default=0.85, alias="DEDUP_SIMILARITY_THRESHOLD")
 
+    # --- YouTube lecture ingest ---
+    youtube_ingest_enabled: bool = Field(default=True, alias="YOUTUBE_INGEST_ENABLED")
+    youtube_sample_every_seconds: float = Field(
+        default=2.0, alias="YOUTUBE_SAMPLE_EVERY_SECONDS"
+    )
+    transcriber_provider: str = Field(default="openai", alias="TRANSCRIBER_PROVIDER")
+
     # --- Document Processing ---
     data_dir: str = "data"
     raw_docs_dir: str = "data/raw"

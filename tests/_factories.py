@@ -22,6 +22,7 @@ def make_chunk(
     content: str = "Sample content",
     page_number: int | None = 1,
     doc_id: str = "doc-abc",
+    metadata: dict | None = None,
 ) -> DocumentChunk:
     return DocumentChunk(
         id=chunk_id,
@@ -31,6 +32,7 @@ def make_chunk(
         chunk_type=chunk_type,
         content=content,
         page_number=page_number,
+        metadata=metadata or {},
     )
 
 

@@ -9,6 +9,8 @@ import type {
   IngestProgressEvent,
   IngestResponse,
   LlmProvider,
+  YouTubeIngestOptions,
+  YouTubeIngestResponse,
   QueryResponse,
   ReadyResponse,
 } from "../types";
@@ -170,6 +172,51 @@ export class RagApiClient {
           "embedding (this can take several minutes on CPU). Check Recent documents " +
           "for the file, or upload again.",
       );
+    }
+    return result;
+  }
+
+  /** YouTube lecture ingest with SSE progress (POST /ingest/youtube/stream). */
+  async youtubeIngestStream(
+    url: string,
+    options: YouTubeIngestOptions,
+    onProgress: (event: IngestProgressEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<YouTubeIngestResponse> {
+    const res = await fetch(this.url("/ingest/youtube/stream"), {
+      method: "POST",
+      headers: await this.authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        url,
+        include_transcript: options.includeTranscript ?? true,
+        include_slides: options.includeSlides ?? true,
+        sample_every_seconds: options.sampleEverySeconds ?? 2.0,
+      }),
+      signal,
+    });
+    if (!res.ok) await throwApiError(res, "YouTube ingest failed");
+
+    let result: YouTubeIngestResponse | null = null;
+    let streamError: string | null = null;
+
+    await readSseStream(
+      res,
+      (event, data) => {
+        if (event === "progress") {
+          onProgress(JSON.parse(data) as IngestProgressEvent);
+        } else if (event === "done") {
+          result = JSON.parse(data) as YouTubeIngestResponse;
+        } else if (event === "error") {
+          const parsed = JSON.parse(data) as { message?: string };
+          streamError = parsed.message ?? "YouTube ingest failed";
+        }
+      },
+      signal,
+    );
+
+    if (streamError) throw new Error(streamError);
+    if (!result) {
+      throw new Error("YouTube ingest finished without a result.");
     }
     return result;
   }

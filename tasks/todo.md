@@ -1,30 +1,44 @@
-# Fix Internal Server Error on /query (torch 2.5 + transformers 5.9)
+# Feature: slide/page-scoped questions for YouTube lectures
 
-- [x] Diagnose: docker logs show `ValueError` from `check_torch_load_is_safe` (torch 2.5.1+cu121, transformers 5.9)
-- [x] Pin `torch>=2.6` in Dockerfile; GPU default index `cu124` (cu121 caps at 2.5.1)
-- [x] Block startup until model warmup completes (or record failure in `/ready`)
-- [x] `/query` returns 503 with actionable message on torch/transformers mismatch
+## Plan
+- [x] parse_page_reference() for "page N" / "slide N" (asset_refs.py)
+- [x] _fetch_slide_scoped_chunks(): slide N content + transcript in its on-screen window
+- [x] Wire into retrieve() (doc-scoped, no asset ref), prepend as priority hits
+- [x] Tests (parser + retrieval window + non-video fallback)
+- [x] Verify on real lecture in Docker
 
-## Review (after implementation)
-
-- verification run: user must `docker compose ... build rag-api ingest-worker` and confirm `torch>=2.6` in container
-- behavior diff notes: `/ready` reports `models: ok|warming|error`; warmup is awaited at startup; GPU default cu124
-- residual risks: hosts without CUDA 12.4 driver may need different TORCH_INDEX_URL; first rebuild re-downloads wheels
+## Review
+### Verification
+- tests/retrieval: 31 passed (incl. new test_slide_scoped_retrieval.py)
+- Live retrieve() "slide 7" on lecture c76bf0f4951aaf7c → slide 7 + transcript 315s-454s prepended (score 100)
+### Behavior diff
+- "what did the author say about slide 7" now returns slide 7's text + what was spoken while it showed, instead of generic semantic hits
+- Non-video docs: returns [] (no slide timestamps) → unchanged semantic behavior
+### Residual risks
+- Page scoping only for video docs; PDF "page N" still semantic (intentional)
+- Window = next-slide timestamp; rapid slide flips may merge brief slides
 
 ---
 
-# Generate the DocuMind reference book (PDF)
+# Fix: YouTube document preview
 
-- [x] Read existing wiki + README + key source files to gather accurate content
-- [x] Write `scripts/generate_book.py` — PyMuPDF book builder with cover, TOC, chapters, code blocks, notes, key-value tables, page headers/footers, bookmarks, deterministic metadata via `SOURCE_DATE_EPOCH`
-- [x] Cover preface + 12 chapters (intro, architecture, ingest, retrieval, generation, guardrails, eval, observability, scaling, deployment, API reference, config reference) + 3 appendices (repo layout, troubleshooting, glossary)
-- [x] Run script; verify 42 pages, ~378 KB; clickable PDF outline matches printed TOC; render sample pages to PNG and confirm layout
-- [x] Replace Unicode box-drawing chars and arrows with ASCII in the two diagrams + the repo tree (Helvetica/Courier base14 fonts ship no box-drawing glyphs)
-- [x] Link the PDF + a Book badge in the README
+## Plan
+
+- [x] Resolve `slides.pdf` for `youtube:{video_id}` sources in admin file endpoint
+- [x] Frontend: HEAD check + friendly message when no slide PDF
+- [x] Tests for preview resolver + admin endpoint
+- [x] Run tests + verify in Docker for ingested lecture
 
 ## Review
 
-- verification run: `python scripts/generate_book.py` → `docs/documind-book.pdf` (42 pages, 378 KB, 87 outline entries: 15 top-level + 72 sections)
-- behavior diff notes: book is byte-reproducible — uses `SOURCE_DATE_EPOCH` (default 1704067200) for both the matplotlib PNG timestamps in the sample report *and* this PDF's CreationDate/ModDate; same script run twice gives identical bytes
-- residual risks: very long key strings in `kv_table` can wrap awkwardly on the inline code column (cosmetic); appendix bookmarks are clamped to outline level 1 because PyMuPDF rejects level 0
+### Verification
+- `pytest tests/video/test_preview.py tests/api/test_api.py::test_document_file_youtube_slides_pdf` — 5 passed
+- Docker: `slides.pdf` at `data/processed/youtube/KAlcMLHBXNQ/`; resolver returns path for `youtube:KAlcMLHBXNQ`
+- `HEAD /admin/documents/{id}/file` enabled (was 405)
 
+### Behavior diff
+- YouTube docs with slide extraction now preview `data/processed/youtube/{id}/slides.pdf`
+- Transcript-only YouTube docs show explanatory message instead of raw JSON error
+
+### Residual risks
+- HEAD on preview URL may not work if nginx strips it; iframe fallback still possible

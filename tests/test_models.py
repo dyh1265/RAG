@@ -43,6 +43,19 @@ def test_enriched_content_with_prefix():
     assert "Revenue rose 15%." in enriched
 
 
+def test_video_and_transcript_enums_exist():
+    chunk = DocumentChunk(
+        doc_id="youtube_abc123",
+        source_path="youtube:abc123",
+        doc_type=DocumentType.VIDEO,
+        chunk_type=ChunkType.TRANSCRIPT,
+        content="The speaker explains treatment heterogeneity.",
+    )
+    assert chunk.doc_type.value == "video"
+    assert chunk.chunk_type.value == "transcript"
+    assert ChunkType.SLIDE.value == "slide"
+
+
 def test_query_request_defaults():
     req = QueryRequest(query="What is the revenue?")
     assert req.top_k == 5

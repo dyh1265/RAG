@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.config import get_settings
-from backend.core.models import QueryRequest, QueryResponse, RetrievedContext
+from backend.core.models import DocumentChunk, QueryRequest, QueryResponse, RetrievedContext
 from backend.ingestion.embeddings.colpali_embedder import ColPaliEmbedder
 from backend.ingestion.embeddings.image_embedder import ImageEmbedder
 from backend.ingestion.embeddings.multimodal_embed import embed_chunks
@@ -219,11 +219,43 @@ class RAGPipeline:
             {"chunk_count": len(chunks), "parser_errors": len(errors)},
         )
 
-        if self._retrieval_enrichment_enabled():
+        result = self.index_chunks(
+            chunks,
+            doc_id=stable_doc_id(pdf_path),
+            source_path=str(pdf_path),
+            tenant_id=tenant_id,
+            on_progress=on_progress,
+        )
+        result.errors.extend(str(e) for e in errors)
+        return result
+
+    def index_chunks(
+        self,
+        chunks: list[DocumentChunk],
+        *,
+        doc_id: str,
+        source_path: str,
+        tenant_id: str = "public",
+        on_progress: IngestProgressFn | None = None,
+        clear_existing: bool = True,
+    ) -> IngestResult:
+        """Embed and store prebuilt ``DocumentChunk``s, reusing the full pipeline.
+
+        This is the source-agnostic core that ``ingest(...)`` delegates to after
+        parsing a file. Callers that build chunks directly (e.g. a YouTube
+        transcript) can index them without going through a file parser.
+
+        The steps mirror the back half of ``ingest``: optional retrieval
+        enrichment, PII redaction, clearing previous vectors for ``doc_id``,
+        cache invalidation, embedding, and upserting into Qdrant.
+        """
+        src_path = Path(source_path)
+
+        if chunks and self._retrieval_enrichment_enabled():
             self._emit_progress(on_progress, "enriching", "Chunking and enriching…")
             chunks = apply_retrieval_ingest(
                 chunks,
-                pdf_path,
+                src_path,
                 RetrievalIngestConfig(
                     use_section_paths=self.config.use_section_paths,
                     use_recursive_chunker=self.config.use_recursive_chunker,
@@ -245,11 +277,11 @@ class RAGPipeline:
 
         if not chunks:
             return IngestResult(
-                doc_id=stable_doc_id(pdf_path),
-                source_path=str(pdf_path),
+                doc_id=doc_id,
+                source_path=source_path,
                 chunk_count=0,
                 chunks_by_type=chunks_by_type,
-                errors=[str(errors[0])] if errors else ["No chunks extracted"],
+                errors=["No chunks extracted"],
             )
 
         try:
@@ -260,9 +292,11 @@ class RAGPipeline:
         except ImportError:
             pass
 
-        doc_id = stable_doc_id(pdf_path)
-        self._emit_progress(on_progress, "indexing", "Clearing previous vectors for document…")
-        self.store.delete_doc(doc_id)
+        if clear_existing:
+            self._emit_progress(
+                on_progress, "indexing", "Clearing previous vectors for document…"
+            )
+            self.store.delete_doc(doc_id)
         invalidate_retrieval_caches(doc_id)
 
         self._emit_progress(
@@ -302,11 +336,10 @@ class RAGPipeline:
 
         return IngestResult(
             doc_id=doc_id,
-            source_path=str(pdf_path),
+            source_path=source_path,
             chunk_count=len(chunks),
             chunks_by_type=chunks_by_type,
             vectors_by_collection=vectors_by_collection,
-            errors=[str(e) for e in errors],
         )
 
     def retrieve(self, request: QueryRequest) -> list[RetrievedContext]:

@@ -23,6 +23,8 @@ class ChunkType(str, Enum):
     FIGURE = "figure"
     PAGE_IMAGE = "page_image"
     HEADING = "heading"
+    TRANSCRIPT = "transcript"  # spoken-audio transcript window (e.g. YouTube)
+    SLIDE = "slide"            # extracted slide frame / generated slide page
 
 
 class DocumentType(str, Enum):
@@ -31,6 +33,7 @@ class DocumentType(str, Enum):
     TXT = "txt"
     IMAGE = "image"
     HTML = "html"
+    VIDEO = "video"
 
 
 class RetrievalStrategy(str, Enum):
@@ -122,6 +125,7 @@ class Citation(BaseModel):
     page_number: int | None
     chunk_id: str
     excerpt: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class QueryResponse(BaseModel):

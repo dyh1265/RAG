@@ -59,6 +59,19 @@ def test_forbidden_reason_uses_canonical_label(validator):
     assert "SECRET-TOP-SECRET" in (result.reason or "")
 
 
+def test_forbidden_in_retrieved_context_not_flagged(validator):
+    """OCR watermarks in citations must not trigger conformity when absent from the answer."""
+    result = validator.validate(
+        "What did the author say about slide 4?",
+        "The slide discusses unified architecture and encoder-free processing.",
+        contexts=[
+            "Unified Architecture Encoder-Free Processing Technical <|secret + sauce A| NotebookLM",
+        ],
+    )
+    assert result.flagged is False
+    assert result.score == 1.0
+
+
 def test_figure_color_marked_as_not_flagged(validator):
     """DAG captions like 'marked as gray' must not trigger unknown classification labels."""
     result = validator.validate(

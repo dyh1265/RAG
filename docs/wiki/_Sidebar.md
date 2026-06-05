@@ -4,6 +4,7 @@
 - [Architecture](Architecture)
 - [Sessions](Sessions)
 - [RAG Pipeline](RAG-Pipeline)
+- [YouTube lecture RAG](YouTube-Lecture-RAG)
 - [Retrieval](Retrieval)
 - [Evaluation](Evaluation)
 - [Configuration](Configuration)

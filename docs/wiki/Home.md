@@ -1,17 +1,17 @@
 # DocuMind Wiki
 
-> Upload a PDF, chat with it, get cited answers — backed by hybrid retrieval, multimodal embeddings, and a CI-gated evaluation suite.
+> Upload a PDF or add a YouTube lecture, chat with it, and get cited answers — backed by hybrid retrieval, multimodal embeddings, and a CI-gated evaluation suite.
 
 This wiki is the long-form companion to the [project README](https://github.com/dyh1265/DocuMind). The README answers *"how do I run it?"*; the wiki answers *"how does it work, and why?"*.
 
 ## What DocuMind is
 
-DocuMind is a production-style Retrieval-Augmented Generation (RAG) system over PDFs. The same pipeline indexes text passages, tables, and figures into separate Qdrant collections, retrieves across all of them at query time, fuses the results, and asks an LLM (OpenAI or local Ollama) to answer with inline citations grounded in the retrieved chunks.
+DocuMind is a production-style Retrieval-Augmented Generation (RAG) system over PDFs and YouTube lectures. The same pipeline indexes text passages, tables, figures, transcript windows, and extracted slide pages into separate Qdrant collections, retrieves across all of them at query time, fuses the results, and asks an LLM (OpenAI or local Ollama) to answer with inline citations grounded in the retrieved chunks.
 
 It is not a toy notebook. The repo ships with:
 
 - A FastAPI service (`backend.api`) with rate limiting, PII redaction, taxonomy guardrails, and OpenTelemetry tracing.
-- A React + Vite frontend (`frontend/`) that uploads documents, chats, and renders source citations.
+- A React + Vite frontend (`frontend/`) that uploads PDFs or YouTube URLs, chats, and renders source citations (including transcript timestamps and slide references).
 - A Celery worker (`backend.scaling`) for bulk-ingest jobs with Redis-backed dedup and progress tracking.
 - A Docker Compose stack with Qdrant, Redis, Prometheus, Grafana, and Jaeger.
 - A reproducible eval suite (`tests/eval/`) with a hand-curated golden set and CI thresholds for recall@5, hit@5, MRR, and p95 retrieval latency.
@@ -23,6 +23,7 @@ It is not a toy notebook. The repo ships with:
 | [Architecture](Architecture) | Understand the service topology and how requests flow end-to-end. |
 | [Sessions](Sessions) | Per-browser document isolation on a shared demo URL (signed tokens, `tenant_id`, no accounts). |
 | [RAG Pipeline](RAG-Pipeline) | Walk the ingest and query stages: parse → enrich → embed → store → retrieve → answer. |
+| [YouTube lecture RAG](YouTube-Lecture-RAG) | Ingest lectures from a URL: transcript + slide extraction, shared doc id, citations. |
 | [Retrieval](Retrieval) | Go deep on hybrid (BM25 + dense), multimodal fusion (text/tables/figures/pages), parent expansion, and rerankers. |
 | [Evaluation](Evaluation) | Understand the golden set, metric definitions, and how CI gates regressions. |
 | [Configuration](Configuration) | Reference for every feature flag and environment variable. |

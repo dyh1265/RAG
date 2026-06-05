@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import httpx
 
+from backend.retrieval.asset_refs import parse_page_reference
 from backend.retrieval.chunk_filters import is_substantive_content
 from backend.core.config import get_settings
-from backend.core.models import Citation, QueryResponse, RetrievedContext
+from backend.core.models import ChunkType, Citation, QueryResponse, RetrievedContext
 
 _SYSTEM_PROMPT = (
     "You are a precise document QA assistant. Answer ONLY using the numbered "
@@ -27,13 +28,69 @@ def _chunk_type_label(chunk_type) -> str:
     return chunk_type.value if hasattr(chunk_type, "value") else str(chunk_type)
 
 
+def _format_timestamp(seconds: float) -> str:
+    total = max(0, int(seconds))
+    hours, rem = divmod(total, 3600)
+    minutes, secs = divmod(rem, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
+
+
+def _passage_label(chunk) -> str:
+    """Human-readable passage tag for the LLM context block."""
+    metadata = chunk.metadata or {}
+    if metadata.get("source_kind") == "youtube":
+        if metadata.get("modality") == "slide":
+            slide_number = metadata.get("slide_number") or chunk.page_number
+            timestamp = metadata.get("timestamp")
+            ts_suffix = (
+                f", ~{_format_timestamp(float(timestamp))} in video"
+                if timestamp is not None
+                else ""
+            )
+            return f"Slide {slide_number} on-screen text{ts_suffix}"
+
+        if metadata.get("modality") == "transcript" or chunk.chunk_type == ChunkType.TRANSCRIPT:
+            start = metadata.get("start_time")
+            end = metadata.get("end_time")
+            time_range = ""
+            if start is not None:
+                time_range = _format_timestamp(float(start))
+                if end is not None:
+                    time_range += f"–{_format_timestamp(float(end))}"
+            aligned = metadata.get("aligned_slide_number")
+            if aligned is not None:
+                suffix = f" ({time_range})" if time_range else ""
+                return f"Spoken during slide {aligned}{suffix}"
+            suffix = f" ({time_range})" if time_range else ""
+            return f"Spoken transcript{suffix}"
+
+    page = chunk.page_number if chunk.page_number is not None else "?"
+    label = _chunk_type_label(chunk.chunk_type)
+    return f"page {page}, {label}"
+
+
+def _slide_scoped_hint(question: str) -> str:
+    slide_number = parse_page_reference(question)
+    if slide_number is None:
+        return ""
+    return (
+        f"\nThe question refers to slide {slide_number} of a video lecture. "
+        "Passages labeled 'Slide N on-screen text' show what appears on the slide; "
+        "passages labeled 'Spoken during slide N' are what the lecturer said aloud "
+        "while that slide was visible. Summarize spoken passages to answer "
+        "'what did the author say'. If no 'Spoken during slide N' passages are present, "
+        "describe what is shown on that slide from the on-screen text and note that "
+        "no narration was indexed for that part of the video.\n"
+    )
+
+
 def _build_context_block(contexts: list[RetrievedContext]) -> str:
     blocks: list[str] = []
     for idx, ctx in enumerate(contexts, start=1):
         chunk = ctx.chunk
-        page = chunk.page_number if chunk.page_number is not None else "?"
-        label = _chunk_type_label(chunk.chunk_type)
-        blocks.append(f"[{idx}] (page {page}, {label})\n{chunk.content.strip()}")
+        blocks.append(f"[{idx}] ({_passage_label(chunk)})\n{chunk.content.strip()}")
     return "\n\n".join(blocks)
 
 
@@ -51,6 +108,7 @@ def _build_citations(contexts: list[RetrievedContext]) -> list[Citation]:
                 page_number=chunk.page_number,
                 chunk_id=chunk.id,
                 excerpt=excerpt,
+                metadata=dict(chunk.metadata),
             )
         )
     return citations
@@ -119,7 +177,10 @@ class AnswerGenerator:
             )
 
         context_block = _build_context_block(contexts)
-        user_prompt = f"Context:\n{context_block}\n\nQuestion: {question}\n\nAnswer:"
+        slide_hint = _slide_scoped_hint(question)
+        user_prompt = (
+            f"Context:\n{context_block}{slide_hint}\nQuestion: {question}\n\nAnswer:"
+        )
 
         if self.provider == "openai":
             answer = self._call_openai(user_prompt)

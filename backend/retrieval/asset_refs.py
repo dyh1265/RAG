@@ -14,6 +14,13 @@ _ASSET_REF = re.compile(
     re.IGNORECASE,
 )
 
+# "page 7", "slide 12", "pg. 3", "slide #4" — used to scope a query to a single
+# lecture slide / document page. Plural forms ("pages 7") deliberately do not match.
+_PAGE_REF = re.compile(
+    r"\b(?:slide|page|pg)\.?\s*#?\s*([0-9]{1,4})\b",
+    re.IGNORECASE,
+)
+
 # Common IEEE / academic Roman numerals.
 _ROMAN_BY_DIGIT: dict[int, str] = {
     1: "I",
@@ -38,6 +45,7 @@ __all__ = [
     "content_matches_asset_label",
     "looks_like_algorithm_body",
     "parse_asset_reference",
+    "parse_page_reference",
 ]
 
 
@@ -55,6 +63,18 @@ def parse_asset_reference(query: str) -> tuple[AssetKind, str] | None:
         kind = "table" if raw_kind == "table" else "figure"
     number = match.group(2)
     return kind, number
+
+
+def parse_page_reference(query: str) -> int | None:
+    """Return the 1-indexed page/slide number when a query names ``page N`` / ``slide N``."""
+    match = _PAGE_REF.search(query.strip())
+    if not match:
+        return None
+    try:
+        number = int(match.group(1))
+    except ValueError:
+        return None
+    return number if number > 0 else None
 
 
 def _label_variants(kind: AssetKind, number: str) -> list[str]:

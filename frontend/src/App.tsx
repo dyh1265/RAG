@@ -6,10 +6,12 @@ import type {
   IngestProgressEvent,
   IngestResponse,
   LlmProvider,
+  YouTubeIngestOptions,
   RecentDocument,
 } from "./types";
 import { Sidebar } from "./components/Sidebar";
 import { PdfUploader } from "./components/PdfUploader";
+import { YouTubeIngestCard } from "./components/YouTubeIngestCard";
 import { ChatPanel } from "./components/ChatPanel";
 import { DocumentPreview } from "./components/DocumentPreview";
 import { StatusBadge } from "./components/StatusBadge";
@@ -42,9 +44,12 @@ export default function App() {
   });
   const [ingesting, setIngesting] = useState(false);
   const [ingestFile, setIngestFile] = useState<{ name: string; size: number } | null>(null);
+  const [ingestLabel, setIngestLabel] = useState<string | null>(null);
   const [ingestProgress, setIngestProgress] = useState<IngestProgressEvent | null>(null);
+  const [ingestTab, setIngestTab] = useState<"pdf" | "youtube">("pdf");
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ingestWarning, setIngestWarning] = useState<string | null>(null);
   const [bulkIndexing, setBulkIndexing] = useState(false);
   const [folderProgress, setFolderProgress] = useState<FolderLoadProgress | null>(null);
   const [uploadDoneToken, setUploadDoneToken] = useState(0);
@@ -154,8 +159,10 @@ export default function App() {
 
   const handleIngest = async (file: File) => {
     setError(null);
+    setIngestWarning(null);
     setIngesting(true);
     setIngestFile({ name: file.name, size: file.size });
+    setIngestLabel(null);
     setIngestProgress(null);
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -185,6 +192,50 @@ export default function App() {
     } finally {
       setIngesting(false);
       setIngestFile(null);
+      setIngestLabel(null);
+      setIngestProgress(null);
+    }
+  };
+
+  const handleYouTubeIngest = async (url: string, options: YouTubeIngestOptions) => {
+    setError(null);
+    setIngestWarning(null);
+    setIngesting(true);
+    setIngestFile(null);
+    setIngestLabel(url);
+    setIngestProgress(null);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const result = await client.youtubeIngestStream(
+        url,
+        options,
+        (ev) => setIngestProgress(ev),
+        controller.signal,
+      );
+      setDocId(result.doc_id);
+      saveActiveDocId(result.doc_id);
+      setIngestInfo(result);
+      setMessages(loadChat(result.doc_id));
+      const updated = addRecentDocument({
+        docId: result.doc_id,
+        name: result.title ?? basenameFromPath(result.source_path, result.doc_id),
+        chunkCount: result.chunk_count,
+        sourcePath: result.source_path || undefined,
+      });
+      setRecentDocs(mergeDocumentLists(updated, []));
+      void refreshDocuments();
+      if (result.warnings?.length) {
+        setIngestWarning(result.warnings.join(" "));
+      }
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") {
+        setError((e as Error).message);
+      }
+    } finally {
+      setIngesting(false);
+      setIngestLabel(null);
       setIngestProgress(null);
     }
   };
@@ -447,7 +498,9 @@ export default function App() {
         <header className="header">
           <div>
             <h1>DocuMind</h1>
-            <p className="subtitle">Multimodal RAG with taxonomy conformity</p>
+            <p className="subtitle">
+              Upload a PDF or add a YouTube lecture — cited answers over text, slides, and figures
+            </p>
           </div>
           <StatusBadge status={apiStatus} apiBase={apiBase} />
         </header>
@@ -458,18 +511,58 @@ export default function App() {
           </div>
         )}
 
+        {ingestWarning && !error && (
+          <div className="banner banner-warn" role="status">
+            {ingestWarning}
+          </div>
+        )}
+
         {!docId ? (
-          <PdfUploader
-            onUpload={handleIngest}
-            ingesting={ingesting}
-            ingestFile={ingestFile}
-            ingestProgress={ingestProgress}
-          />
+          <div className="ingest-shell">
+            <div className="ingest-tabs" role="tablist" aria-label="Ingest source">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={ingestTab === "pdf"}
+                className={`ingest-tab ${ingestTab === "pdf" ? "ingest-tab-active" : ""}`}
+                onClick={() => setIngestTab("pdf")}
+                disabled={ingesting}
+              >
+                Upload PDF
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={ingestTab === "youtube"}
+                className={`ingest-tab ${ingestTab === "youtube" ? "ingest-tab-active" : ""}`}
+                onClick={() => setIngestTab("youtube")}
+                disabled={ingesting}
+              >
+                Add YouTube Lecture
+              </button>
+            </div>
+            {ingestTab === "pdf" ? (
+              <PdfUploader
+                onUpload={handleIngest}
+                ingesting={ingesting}
+                ingestFile={ingestFile}
+                ingestProgress={ingestProgress}
+              />
+            ) : (
+              <YouTubeIngestCard
+                onIngest={handleYouTubeIngest}
+                ingesting={ingesting}
+                ingestLabel={ingestLabel}
+                ingestProgress={ingestProgress}
+              />
+            )}
+          </div>
         ) : (
           <div className="workspace">
             <DocumentPreview
               docId={docId}
               docName={activeDoc?.name}
+              sourcePath={activeDoc?.sourcePath}
               apiBase={apiBase}
               page={previewPage}
             />

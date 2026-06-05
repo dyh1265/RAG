@@ -118,6 +118,8 @@ services:
       USE_PII_REDACTION_ON_INGEST: "true"
       API_WARMUP_MODELS: "true"
       USE_OCR: "true"
+      YOUTUBE_INGEST_ENABLED: "true"
+      TRANSCRIBER_PROVIDER: "${TRANSCRIBER_PROVIDER:-openai}"
     volumes:
       - ../data:/app/data
       - ../backend:/app/backend

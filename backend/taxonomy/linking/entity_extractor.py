@@ -27,6 +27,11 @@ _KNOWN_KEYWORDS = sorted(
     reverse=True,
 )
 _STOP_WORDS = (" because ", " since ", " as it ", " — ")
+# NotebookLM / slide-OCR watermarks — not document classification markings
+_WATERMARK_SECRET_RE = re.compile(
+    r"<\|?\s*secret\s*\+\s*sauce|secret\s*\+\s*sauce|notebooklm",
+    re.IGNORECASE,
+)
 # Figure / visualization colors — not document classification labels
 _NON_CLASSIFICATION_TERMS = frozenset({
     "GRAY", "GREY", "GREEN", "BLUE", "RED", "YELLOW", "ORANGE", "PURPLE", "BLACK", "WHITE",
@@ -70,7 +75,10 @@ def extract_classification_terms(*texts: str) -> list[str]:
         normalized_text = _normalize(text)
         for kw in _KNOWN_KEYWORDS:
             kw_norm = _normalize(kw)
-            if kw_norm in normalized_text:
-                found.add(kw_norm)
+            if kw_norm not in normalized_text:
+                continue
+            if kw_norm == "SECRET" and _WATERMARK_SECRET_RE.search(text):
+                continue
+            found.add(kw_norm)
 
     return _prune_substrings(sorted(t for t in found if t not in _NON_CLASSIFICATION_TERMS))

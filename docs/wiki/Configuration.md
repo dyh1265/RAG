@@ -77,6 +77,16 @@ For shared demos (Cloudflare Tunnel, classroom kiosk, etc.), each browser gets a
 | `SESSION_SECRET` | `documind-dev-secret-change-me` | HMAC secret for signing anonymous session tokens. **Set a long random value** on any public deployment — the default allows forged tokens. |
 | `SESSION_MAX_AGE_SECONDS` | `2592000` (30 days) | Token lifetime from issued-at (`0` = never expire). |
 
+## YouTube lecture ingest
+
+See [YouTube lecture RAG](YouTube-Lecture-RAG) for the full flow. Requires **ffmpeg**, **yt-dlp**, and (for slides) **OpenCV** + **imagehash** in the runtime environment — included in `docker/Dockerfile`.
+
+| Env var | Default | What |
+|---|---|---|
+| `YOUTUBE_INGEST_ENABLED` | `true` | Expose `POST /ingest/youtube/stream`. Set `false` to disable the route (503). |
+| `TRANSCRIBER_PROVIDER` | `openai` | `openai` uses the Whisper API (`OPENAI_API_KEY` required). `mock` returns canned segments for tests. |
+| `YOUTUBE_SAMPLE_EVERY_SECONDS` | `2.0` | Seconds between sampled video frames when extracting slides. |
+
 ## API & guardrails
 
 | Env var | Default | What |

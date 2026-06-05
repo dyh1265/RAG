@@ -19,7 +19,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tesseract-ocr \
+    && apt-get install -y --no-install-recommends tesseract-ocr ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --upgrade pip \
     && pip install "torch>=2.6.0" "torchvision>=0.21.0" --index-url "${TORCH_INDEX_URL}" \
@@ -56,6 +56,10 @@ RUN apt-get update \
         "prometheus-client>=0.20" \
         "pytesseract>=0.3" \
         "Pillow>=10.0" \
+        "openai>=1.0" \
+        "yt-dlp>=2025.1" \
+        "opencv-python-headless>=4.9" \
+        "imagehash>=4.3" \
     && python -m spacy download en_core_web_sm
 
 COPY backend/ backend/

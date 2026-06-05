@@ -4,6 +4,20 @@ export interface Citation {
   page_number: number | null;
   chunk_id: string;
   excerpt: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface YouTubeIngestOptions {
+  includeTranscript?: boolean;
+  includeSlides?: boolean;
+  sampleEverySeconds?: number;
+}
+
+export interface YouTubeIngestResponse extends IngestResponse {
+  video_id?: string | null;
+  title?: string | null;
+  slides_pdf_path?: string | null;
+  warnings?: string[];
 }
 
 export interface RetrievedContext {

@@ -54,6 +54,20 @@ class IngestResponseOut(BaseModel):
     skipped: bool = False
 
 
+class YouTubeIngestBody(BaseModel):
+    url: str = Field(min_length=1, max_length=2048)
+    include_transcript: bool = True
+    include_slides: bool = True
+    sample_every_seconds: float = Field(default=2.0, ge=0.5, le=30.0)
+
+
+class YouTubeIngestResponse(IngestResponseOut):
+    video_id: str | None = None
+    title: str | None = None
+    slides_pdf_path: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
 class DirectoryIngestBody(BaseModel):
     directory: str = Field(description="Path under data/raw (e.g. data/raw/applications)")
     recursive: bool = True

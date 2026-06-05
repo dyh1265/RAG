@@ -42,3 +42,21 @@ def test_embed_chunks_routes_by_type():
     assert figure_args[0].chunk_type == ChunkType.FIGURE
 
     assert len(result) == 3
+
+
+def test_transcript_chunks_route_to_text_embedder():
+    transcript = make_chunk(
+        chunk_id="tr1", chunk_type=ChunkType.TRANSCRIPT, content="spoken words"
+    )
+    text_embedder = MagicMock()
+    text_embedder.embed_chunks.return_value = [
+        EmbeddedChunk(chunk=transcript, vector=[1.0], model_name="bge-m3"),
+    ]
+    image_embedder = MagicMock()
+    image_embedder.embed_figure_chunks.return_value = []
+
+    result = embed_chunks([transcript], text_embedder, image_embedder)
+
+    text_args = text_embedder.embed_chunks.call_args[0][0]
+    assert [c.chunk_type for c in text_args] == [ChunkType.TRANSCRIPT]
+    assert len(result) == 1

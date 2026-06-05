@@ -7,8 +7,16 @@ from backend.ingestion.embeddings.colpali_embedder import ColPaliEmbedder
 from backend.ingestion.embeddings.image_embedder import ImageEmbedder
 from backend.ingestion.embeddings.text_embedder import TextEmbedder
 
-TEXT_CHUNK_TYPES = {ChunkType.TEXT, ChunkType.TABLE, ChunkType.HEADING}
-TEXT_OR_PAGE_TYPES = TEXT_CHUNK_TYPES | {ChunkType.PAGE_IMAGE}
+# Transcript windows are plain text and live in the text collection.
+TEXT_CHUNK_TYPES = {
+    ChunkType.TEXT,
+    ChunkType.TABLE,
+    ChunkType.HEADING,
+    ChunkType.TRANSCRIPT,
+}
+# Slide frames behave like page images (OCR'd content, optional ColPali image).
+PAGE_LIKE_TYPES = {ChunkType.PAGE_IMAGE, ChunkType.SLIDE}
+TEXT_OR_PAGE_TYPES = TEXT_CHUNK_TYPES | PAGE_LIKE_TYPES
 
 
 def embed_chunks(
@@ -23,7 +31,9 @@ def embed_chunks(
     text_types = TEXT_CHUNK_TYPES if use_colpali else TEXT_OR_PAGE_TYPES
     text_chunks = [c for c in chunks if c.chunk_type in text_types]
     figure_chunks = [c for c in chunks if c.chunk_type == ChunkType.FIGURE]
-    page_chunks = [c for c in chunks if c.chunk_type == ChunkType.PAGE_IMAGE] if use_colpali else []
+    page_chunks = (
+        [c for c in chunks if c.chunk_type in PAGE_LIKE_TYPES] if use_colpali else []
+    )
 
     embedded: list[EmbeddedChunk] = []
     embedded.extend(text_embedder.embed_chunks(text_chunks))

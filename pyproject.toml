@@ -40,6 +40,10 @@ dependencies = [
     "rich>=13.0",
     "tqdm>=4.0",
     "httpx>=0.27",
+    "openai>=1.0",
+    "yt-dlp>=2025.1",
+    "opencv-python-headless>=4.9",
+    "imagehash>=4.3",
     # Ingestion (PDF parsing, OCR, embeddings, vector store)
     "pymupdf>=1.24",
     "pdf2image>=1.17",

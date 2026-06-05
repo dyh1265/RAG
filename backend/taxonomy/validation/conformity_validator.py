@@ -91,17 +91,16 @@ class ConformityValidator:
         answer: str,
         contexts: list[str] | None = None,
     ) -> ConformityResult:
-        context_texts = contexts or []
         query_terms = extract_classification_terms(query)
         answer_only_terms = extract_classification_terms(answer)
-        context_terms = extract_classification_terms(*context_texts) if context_texts else []
-        answer_terms = sorted(set(answer_only_terms) | set(context_terms))
 
         # Query requesting forbidden classification is always flagged
         query_linked = link_terms(query_terms, self.taxonomy)
         forbidden_in_query = _forbidden_from_linked(query_linked)
 
-        answer_linked = link_terms(answer_terms, self.taxonomy)
+        # Only the generated answer is checked for forbidden labels — not retrieved
+        # context (OCR watermarks like NotebookLM "<|secret + sauce" must not flag).
+        answer_linked = link_terms(answer_only_terms, self.taxonomy)
         forbidden_in_answer = [
             lt.matched_label
             for lt in answer_linked
@@ -150,7 +149,7 @@ class ConformityValidator:
             )
 
         # No classification language — not a taxonomy-sensitive response
-        if not query_terms and not answer_terms:
+        if not query_terms and not answer_only_terms:
             return ConformityResult(
                 score=1.0,
                 flagged=False,
@@ -159,7 +158,7 @@ class ConformityValidator:
             )
 
         # Allowed labels only
-        if allowed_matches or not answer_terms:
+        if allowed_matches or not answer_only_terms:
             return ConformityResult(
                 score=1.0,
                 flagged=False,

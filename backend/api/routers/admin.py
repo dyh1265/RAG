@@ -22,6 +22,7 @@ from backend.core.data_browser import browse_directory
 from backend.core.pdf_paths import resolve_under_base
 from backend.core.pipeline import RAGPipeline
 from backend.core.suggested_questions import build_suggested_questions
+from backend.video.preview import resolve_youtube_slides_pdf
 
 router = APIRouter()
 
@@ -104,7 +105,7 @@ def _resolve_pdf_path(source_path: str, settings: Settings) -> Path:
     raise FileNotFoundError(source_path)
 
 
-@router.get("/documents/{doc_id}/file")
+@router.api_route("/documents/{doc_id}/file", methods=["GET", "HEAD"])
 async def get_document_file(
     doc_id: str,
     pipeline: RAGPipeline = Depends(get_pipeline),
@@ -121,7 +122,8 @@ async def get_document_file(
         try:
             return _resolve_pdf_path(source_path, settings)
         except FileNotFoundError:
-            return None
+            processed = Path(settings.processed_docs_dir).resolve()
+            return resolve_youtube_slides_pdf(source_path, processed)
 
     pdf_path = await asyncio.to_thread(_resolve)
     if pdf_path is None:

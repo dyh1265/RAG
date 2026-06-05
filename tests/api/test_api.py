@@ -92,6 +92,35 @@ def test_document_file_not_found(client):
     assert response.status_code == 404
 
 
+def test_document_file_youtube_slides_pdf(client, tmp_path):
+    video_id = "KAlCMLHBXNQ"
+    processed = tmp_path / "processed"
+    slides_dir = processed / "youtube" / video_id
+    slides_dir.mkdir(parents=True)
+    slides_pdf = slides_dir / "slides.pdf"
+    slides_pdf.write_bytes(b"%PDF-1.4 youtube slides")
+
+    from backend.api.dependencies import get_app_settings
+
+    mock_settings = MagicMock()
+    mock_settings.data_dir = str(tmp_path)
+    mock_settings.raw_docs_dir = str(tmp_path / "raw")
+    mock_settings.processed_docs_dir = str(processed)
+    client.app.dependency_overrides[get_app_settings] = lambda: mock_settings
+
+    client.app.state.pipeline.store.get_document_source_path.return_value = (
+        f"youtube:{video_id}"
+    )
+
+    try:
+        response = client.get(f"/admin/documents/{video_id}/file")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert response.content.startswith(b"%PDF")
+    finally:
+        client.app.dependency_overrides.pop(get_app_settings, None)
+
+
 def test_document_suggestions(client):
     from backend.core.models import ChunkType, DocumentChunk, DocumentType
 

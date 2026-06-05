@@ -18,6 +18,8 @@ COLLECTION_MAP: dict[ChunkType, str] = {
     ChunkType.FIGURE: "figure_chunks",
     ChunkType.PAGE_IMAGE: "page_chunks",
     ChunkType.HEADING: "text_chunks",  # headings go into the text collection
+    ChunkType.TRANSCRIPT: "text_chunks",  # transcript windows are text-searchable
+    ChunkType.SLIDE: "page_chunks",  # slide frames behave like page images
 }
 
 
@@ -147,6 +149,7 @@ class QdrantStore:
                         "doc_id": ec.chunk.doc_id,
                         "tenant_id": tenant_id,
                         "source_path": ec.chunk.source_path,
+                        "doc_type": ec.chunk.doc_type.value,
                         "chunk_type": ec.chunk.chunk_type.value,
                         "content": ec.chunk.content,
                         "page_number": ec.chunk.page_number,
@@ -272,11 +275,17 @@ class QdrantStore:
                 chunk_type = ChunkType(chunk_type)
             except ValueError:
                 chunk_type = ChunkType.TEXT
+        # Older payloads predate the stored doc_type; default them to PDF so
+        # legacy documents keep loading, while new sources (e.g. video) round-trip.
+        try:
+            doc_type = DocumentType(payload.get("doc_type", DocumentType.PDF.value))
+        except ValueError:
+            doc_type = DocumentType.PDF
         return DocumentChunk(
             id=str(point_id),
             doc_id=payload["doc_id"],
             source_path=payload["source_path"],
-            doc_type=DocumentType.PDF,
+            doc_type=doc_type,
             chunk_type=chunk_type,
             content=payload["content"],
             page_number=payload.get("page_number"),

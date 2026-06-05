@@ -695,12 +695,51 @@ body {
   cursor: not-allowed;
 }
 
+.ingest-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  gap: 1rem;
+}
+
+.ingest-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.ingest-tab {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.5rem 1rem;
+  border-radius: calc(var(--radius) - 2px);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ingest-tab-active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.ingest-tab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .upload-zone {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  width: 100%;
 }
 
 .drop-area {
@@ -768,6 +807,62 @@ body {
   font-size: 0.8rem;
   color: var(--primary);
   font-weight: 500;
+}
+
+.youtube-ingest {
+  width: min(560px, 100%);
+}
+
+.youtube-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.youtube-url-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+}
+
+.youtube-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.youtube-check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.youtube-advanced-toggle {
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.youtube-advanced {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.youtube-advanced input {
+  width: 4rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
 }
 
 .spinner {
@@ -894,6 +989,13 @@ body {
   margin: 0;
   padding: 1rem;
   color: var(--error-border);
+  font-size: 0.9rem;
+}
+
+.doc-preview-loading {
+  margin: 0;
+  padding: 1rem;
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
@@ -1086,6 +1188,20 @@ body {
   margin: 0.5rem 0 0;
   padding-left: 1.25rem;
   color: var(--muted);
+}
+
+.citation-youtube-link,
+.citation-youtube-label {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.citation-youtube-link {
+  text-decoration: none;
+}
+
+.citation-youtube-link:hover {
+  text-decoration: underline;
 }
 
 .chat-input-row {

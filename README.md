@@ -7,7 +7,7 @@
 [![Wiki](https://img.shields.io/badge/wiki-architecture%20%C2%B7%20retrieval%20%C2%B7%20eval-1f6feb)](https://github.com/dyh1265/DocuMind/wiki)
 [![Book](https://img.shields.io/badge/book-PDF%20reference-7c3aed)](docs/documind-book.pdf)
 
-Upload a PDF, chat with it, get cited answers. Production-grade multimodal RAG over text, tables, and figures — with hybrid retrieval, taxonomy conformity checks, PII redaction, and an OpenTelemetry-instrumented FastAPI backend.
+Upload a PDF or add a YouTube lecture, chat with it, and get cited answers. DocuMind is a production-grade multimodal RAG system over documents, slides, figures, tables, and educational videos — with hybrid retrieval, taxonomy conformity checks, PII redaction, and an OpenTelemetry-instrumented FastAPI backend.
 
 > Looking for the long-form deep dive? See [**DocuMind — The Complete Reference**](docs/documind-book.pdf) (42-page PDF, regenerated from the repo via `python scripts/generate_book.py`).
 
@@ -60,7 +60,8 @@ flowchart LR
 | `backend/generation/` | Query-time answer synthesis (OpenAI / Ollama backends) |
 | `backend/scaling/` | Celery bulk-ingest workers, Redis cache, dedup, fingerprinting |
 | `backend/taxonomy/` | RDF taxonomy validation, conformity hooks, fuzzy entity linking |
-| [`frontend/`](frontend/) | React + Vite UI (chat, citations, document admin, bulk upload) |
+| `backend/video/` | YouTube lecture ingest: URL validation, download, transcription, slide extraction |
+| [`frontend/`](frontend/) | React + Vite UI (PDF + YouTube ingest, chat, citations, document admin, bulk upload) |
 | [`docker/`](docker/) | Compose stack: Qdrant, Redis, Prometheus, Grafana, Jaeger, API, worker, web |
 | [`tests/`](tests/) | Pytest suite mirroring `backend/` layout |
 | [`data/`](data/) | `raw/` (PDFs, gitignored except samples), `processed/` (cache), `taxonomies/` (RDF) |
@@ -120,7 +121,43 @@ docker compose --profile dev up -d --build   # Vite at http://localhost:5173
 
 ### 3. Use it
 
-Open http://localhost → upload [`data/raw/sample_report.pdf`](data/raw/sample_report.pdf) → ask "What does Figure 3 show about revenue trends?".
+**PDF:** Open http://localhost → **Upload PDF** → choose [`data/raw/sample_report.pdf`](data/raw/sample_report.pdf) → ask *"What does Figure 3 show about revenue trends?"*.
+
+**YouTube lecture:** **Add YouTube Lecture** → paste a watch URL → enable transcript and/or slide extraction → chat with timestamp- and slide-aware citations.
+
+## YouTube lecture RAG
+
+DocuMind ingests a YouTube URL through the **same** `RAGPipeline`, Qdrant store, retrieval, and generation stack as PDFs — not a separate YouTube RAG system.
+
+1. Download and transcribe the audio (OpenAI Whisper by default).
+2. Chunk the timestamped transcript and index via `RAGPipeline.index_chunks`.
+3. Sample video frames, deduplicate slides (perceptual hash), build `slides.pdf`.
+4. Parse and OCR-index the slide PDF with the existing ingestion pipeline.
+5. Answer with citations such as **Transcript 00:08:12–00:08:55** or **Slide 6, extracted around 00:08:20**.
+
+Ask about a **specific slide** — e.g. *"What did the author say about slide 7?"*. DocuMind returns slide 7's on-screen text plus the transcript spoken while it was on screen (bounded by the next slide's timestamp), so the answer reflects the narration for that slide rather than a generic semantic match.
+
+```bash
+# API (SSE progress — same events as PDF /ingest/stream)
+curl -N -X POST http://localhost:8002/ingest/youtube/stream \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://www.youtube.com/watch?v=VIDEO_ID","include_transcript":true,"include_slides":false}'
+```
+
+> **Tip:** Keep `TRANSCRIBER_PROVIDER=openai` for real transcripts. With `mock`, every video gets the same two canned segments (smoke-test only) — re-ingest with `openai` to replace a mock transcript.
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `YOUTUBE_INGEST_ENABLED` | `true` | Enable `POST /ingest/youtube/stream` |
+| `TRANSCRIBER_PROVIDER` | `openai` | `openai` or `mock` (tests) |
+| `YOUTUBE_SAMPLE_EVERY_SECONDS` | `2.0` | Frame sampling interval for slides |
+| `OPENAI_API_KEY` | — | Required for OpenAI transcription |
+
+Docker ships **ffmpeg**, **yt-dlp**, **opencv-python-headless**, and **imagehash** in the API image. Rebuild after pulling: `docker compose build rag-api`.
+
+> **Limitation:** Only ingest videos you have the right to process. YouTube support is intended for personal knowledge management, lectures, and authorized content.
+
+Details: [YouTube lecture RAG (wiki)](docs/wiki/YouTube-Lecture-RAG.md).
 
 ## Backend dev
 
@@ -185,6 +222,9 @@ All backend settings live in [`backend/core/config.py`](backend/core/config.py) 
 | `CORS_ALLOW_ORIGINS` | `*` | Comma-separated allowed origins. Use `*` for local/demo; set explicit origins in production. |
 | `SESSION_SECRET` | _dev default_ | HMAC secret that signs anonymous session tokens isolating each browser's documents. **Set a long random value for any shared/public demo** — the default lets tokens be forged. |
 | `SESSION_MAX_AGE_SECONDS` | `2592000` | Lifetime of a session token (30 days; `0` disables expiry). |
+| `YOUTUBE_INGEST_ENABLED` | `true` | Enable YouTube lecture ingest API + UI |
+| `TRANSCRIBER_PROVIDER` | `openai` | `openai` (Whisper API) or `mock` for tests |
+| `YOUTUBE_SAMPLE_EVERY_SECONDS` | `2.0` | Seconds between sampled frames for slide extraction |
 
 ## Benchmarks
 
@@ -275,6 +315,7 @@ The [project Wiki](https://github.com/dyh1265/DocuMind/wiki) is the long-form co
 
 - [Architecture](https://github.com/dyh1265/DocuMind/wiki/Architecture) — service topology and request flow.
 - [RAG Pipeline](https://github.com/dyh1265/DocuMind/wiki/RAG-Pipeline) — every stage from parse to answer, with code references.
+- [YouTube lecture RAG](https://github.com/dyh1265/DocuMind/wiki/YouTube-Lecture-RAG) — transcript + slide ingest, API, citations, limitations.
 - [Retrieval](https://github.com/dyh1265/DocuMind/wiki/Retrieval) — hybrid BM25 + dense, multimodal RRF fusion, parent expansion, rerankers, ColPali.
 - [Evaluation](https://github.com/dyh1265/DocuMind/wiki/Evaluation) — golden set, metrics, CI gates.
 - [Configuration](https://github.com/dyh1265/DocuMind/wiki/Configuration) — full env-var reference.

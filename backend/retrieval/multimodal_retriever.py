@@ -29,6 +29,7 @@ from backend.retrieval.asset_refs import (
     content_matches_asset_label,
     looks_like_algorithm_body,
     parse_asset_reference,
+    parse_page_reference,
 )
 from backend.retrieval.cross_encoder_reranker import CrossEncoderReranker
 from backend.retrieval.list_expand import expand_split_list_items
@@ -400,6 +401,86 @@ class MultiModalRetriever:
 
         return hits
 
+    def _fetch_slide_scoped_chunks(
+        self, doc_id: str, slide_number: int
+    ) -> list[RetrievedContext]:
+        """For a YouTube lecture, return slide N plus the transcript spoken while it showed.
+
+        Slide chunks carry ``metadata.slide_number`` and ``metadata.timestamp`` (the video
+        second the slide appeared); transcript chunks carry ``start_time`` / ``end_time``.
+        We bound slide N's on-screen window by the next slide's timestamp and return every
+        transcript chunk overlapping it, so the answer reflects what was said about that slide.
+        Returns ``[]`` for non-video documents (no slide timestamps), falling back to search.
+        """
+        slide_ts: dict[int, float] = {}
+
+        def _slide_number(chunk) -> int | None:
+            md = chunk.metadata or {}
+            raw = md.get("slide_number")
+            if raw is None:
+                raw = chunk.page_number
+            try:
+                return int(raw) if raw is not None else None
+            except (TypeError, ValueError):
+                return None
+
+        page_chunks = self.store.scroll_collection(
+            COLLECTION_MAP[ChunkType.PAGE_IMAGE],
+            filters={"doc_id": doc_id},
+        )
+        for chunk in page_chunks:
+            md = chunk.metadata or {}
+            if md.get("modality") != "slide":
+                continue
+            num = _slide_number(chunk)
+            ts = md.get("timestamp")
+            if num is not None and ts is not None:
+                slide_ts.setdefault(num, float(ts))
+
+        if slide_number not in slide_ts:
+            return []
+
+        start_ts = slide_ts[slide_number]
+        later = [ts for ts in slide_ts.values() if ts > start_ts]
+        end_ts = min(later) if later else float("inf")
+
+        text_chunks = self.store.scroll_collection(
+            COLLECTION_MAP[ChunkType.TEXT],
+            filters={"doc_id": doc_id},
+        )
+        slide_content = [
+            chunk
+            for chunk in text_chunks
+            if (chunk.metadata or {}).get("modality") == "slide"
+            and _slide_number(chunk) == slide_number
+        ]
+        if not slide_content:
+            slide_content = [
+                chunk for chunk in page_chunks if _slide_number(chunk) == slide_number
+            ]
+
+        spoken: list[tuple[float, object]] = []
+        for chunk in text_chunks:
+            md = chunk.metadata or {}
+            if md.get("modality") != "transcript" and chunk.chunk_type != ChunkType.TRANSCRIPT:
+                continue
+            start = md.get("start_time")
+            if start is None:
+                continue
+            start = float(start)
+            end = float(md.get("end_time")) if md.get("end_time") is not None else start
+            if start < end_ts and end > start_ts:
+                spoken.append((start, chunk))
+        spoken.sort(key=lambda item: item[0])
+
+        hits = [self._labeled_hit(chunk) for chunk in slide_content]
+        for _, chunk in spoken:
+            metadata = dict(chunk.metadata or {})
+            metadata["aligned_slide_number"] = slide_number
+            aligned = chunk.model_copy(update={"metadata": metadata})
+            hits.append(self._labeled_hit(aligned))
+        return hits
+
     def _expand_parent_contexts(
         self,
         contexts: list[RetrievedContext],
@@ -501,6 +582,24 @@ class MultiModalRetriever:
         if doc_scoped and asset_ref is not None:
             kind, number = asset_ref
             asset_hits = self._fetch_labeled_asset_chunks(doc_id, kind, number)
+
+        slide_hits: list[RetrievedContext] = []
+        if doc_scoped and asset_ref is None:
+            page_ref = parse_page_reference(request.query)
+            if page_ref is not None:
+                slide_hits = self._fetch_slide_scoped_chunks(doc_id, page_ref)
+                if slide_hits:
+                    reranked: list[RetrievedContext] = []
+                    for rank, ctx in enumerate(slide_hits[: request.top_k], start=1):
+                        reranked.append(
+                            RetrievedContext(
+                                chunk=ctx.chunk,
+                                score=ctx.score,
+                                strategy=ctx.strategy,
+                                rank=rank,
+                            )
+                        )
+                    return self._expand_parent_contexts(reranked)
 
         q_lower = request.query.lower()
         hybrid_handled_pages = False
