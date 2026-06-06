@@ -129,6 +129,8 @@ docker compose --profile dev up -d --build   # Vite at http://localhost:5173
 
 DocuMind ingests a YouTube URL through the **same** `RAGPipeline`, Qdrant store, retrieval, and generation stack as PDFs — not a separate YouTube RAG system.
 
+![YouTube lecture ingest — transcribe audio and extract slides](docs/images/demo_youtube_ingest.gif)
+
 1. Download and transcribe the audio (OpenAI Whisper by default).
 2. Chunk the timestamped transcript and index via `RAGPipeline.index_chunks`.
 3. Sample video frames, deduplicate slides (perceptual hash), build `slides.pdf`.
@@ -136,6 +138,8 @@ DocuMind ingests a YouTube URL through the **same** `RAGPipeline`, Qdrant store,
 5. Answer with citations such as **Transcript 00:08:12–00:08:55** or **Slide 6, extracted around 00:08:20**.
 
 Ask about a **specific slide** — e.g. *"What did the author say about slide 7?"*. DocuMind returns slide 7's on-screen text plus the transcript spoken while it was on screen (bounded by the next slide's timestamp), so the answer reflects the narration for that slide rather than a generic semantic match.
+
+![Slide-scoped Q&A — cited answer over slide + transcript with timestamps](docs/images/demo_youtube_qa.gif)
 
 ```bash
 # API (SSE progress — same events as PDF /ingest/stream)

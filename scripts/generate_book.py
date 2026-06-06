@@ -666,7 +666,9 @@ def build_book() -> BookBuilder:
         "layer you are debugging. Chapters 7 through 10 cover the operational "
         "surface — evaluation, observability, scaling, deployment. Chapters "
         "11 and 12, and the appendices, are reference material: dip into them "
-        "when you need an HTTP endpoint or a config flag."
+        "when you need an HTTP endpoint or a config flag. Chapter 13 covers an "
+        "alternative ingest source — YouTube lectures — that rides the same "
+        "pipeline as PDFs."
     )
     b.note(
         "convention",
@@ -870,6 +872,10 @@ def build_book() -> BookBuilder:
         "and is fully overridable. The whole thing lives behind "
         "RAGPipeline.ingest(path) and emits structured progress events when "
         "called via POST /ingest/stream — see Chapter 11 for the SSE protocol."
+    )
+    b.note(
+        "not only PDFs",
+        "PDFs are the primary source, but the same pipeline also ingests YouTube lectures: a video's transcript and slides are reduced to the same chunks and collections described here. That path is covered in Chapter 13.",
     )
 
     b.section("Parsing")
@@ -1610,6 +1616,7 @@ def build_book() -> BookBuilder:
         ("POST /ingest", "Upload a single PDF; runs the full pipeline synchronously and returns the IngestResponse."),
         ("POST /ingest/stream", "Same as /ingest but emits an SSE progress stream with stages: uploading, parsing, enriching, redacting, embedding, indexing. Terminal events: done (with the IngestResponse) or error."),
         ("POST /ingest/directory", "Server-side directory ingest. The body specifies a path under data/raw/; the API walks recursively (unless recursive=false) and runs the pipeline per PDF."),
+        ("POST /ingest/youtube/stream", "Ingest a YouTube lecture URL. Body: {url, include_transcript, include_slides, sample_every_seconds}. Same SSE stages as /ingest/stream; the done payload extends IngestResponse with video_id, title, slides_pdf_path, and warnings. Returns 503 when YOUTUBE_INGEST_ENABLED=false. See Chapter 13."),
     ])
 
     b.subsection("Bulk ingest")
@@ -1687,6 +1694,13 @@ def build_book() -> BookBuilder:
         ("OCR_LANG", "Default eng. Tesseract language code."),
     ])
 
+    b.section("YouTube lecture ingest")
+    b.kv_table([
+        ("YOUTUBE_INGEST_ENABLED", "Default true. When false, POST /ingest/youtube/stream returns 503."),
+        ("TRANSCRIBER_PROVIDER", "Default openai (Whisper; needs OPENAI_API_KEY). Set to mock for offline tests — but note the mock returns canned text for every video."),
+        ("YOUTUBE_SAMPLE_EVERY_SECONDS", "Default 2.0. Frame-sampling interval for slide extraction."),
+    ])
+
     b.section("API, guardrails, observability")
     b.kv_table([
         ("API_RATE_LIMIT_PER_MINUTE", "Default 60. Per-IP cap for /query and single-file /ingest."),
@@ -1718,6 +1732,142 @@ def build_book() -> BookBuilder:
     ])
 
     # =========================================================================
+    # Chapter 13: YouTube lecture ingestion
+    # =========================================================================
+    b.chapter("Ingesting YouTube Lectures")
+
+    b.para(
+        "PDFs are not the only thing worth asking questions about. DocuMind can "
+        "ingest a YouTube lecture URL and turn it into a searchable document "
+        "that behaves exactly like a PDF in the chat UI — same retrieval, same "
+        "citations, same answer generation. There is no separate 'video stack': "
+        "a lecture is reduced to the same DocumentChunk objects every other "
+        "ingest path produces, written to the same Qdrant collections."
+    )
+
+    b.section("Two modalities from one URL")
+    b.para(
+        "A single video yields up to two streams of chunks, which share one "
+        "doc_id (youtube:{video_id} hashed) so chat retrieval spans both:"
+    )
+    b.kv_table([
+        ("Transcript", "Audio is downloaded, transcribed (OpenAI Whisper by default), and chunked with start/end timestamps. Each chunk is indexed as ChunkType.TRANSCRIPT inside the existing text_chunks collection — no new collection, no new embedder."),
+        ("Slides", "Video frames are sampled at a fixed interval, near-duplicate frames are dropped with perceptual hashing, the survivors are assembled into a slides.pdf, and that PDF is parsed and OCR-indexed through the very same PDF pipeline used for uploads."),
+    ])
+    b.para(
+        "Because both modalities collapse onto one doc_id, a question can be "
+        "answered from the spoken narration, the on-screen slide text, or both "
+        "at once — and the citation tells the user which."
+    )
+
+    b.section("The ingest path")
+    b.para(
+        "The whole flow lives under backend/video/ and is orchestrated by "
+        "YouTubeIngestor; it reuses RAGPipeline.index_chunks rather than "
+        "reimplementing embedding or storage."
+    )
+    b.code(
+        "YouTube URL\n"
+        "  -> backend/video/youtube_ingestor.py\n"
+        "  -> transcript: download audio -> transcribe -> segments_to_chunks\n"
+        "                 -> RAGPipeline.index_chunks\n"
+        "  -> slides:     download video -> sample frames -> phash dedup\n"
+        "                 -> slides.pdf -> parse -> index_chunks (clear_existing=false)\n"
+        "  -> same Qdrant collections, embeddings, retrieval, and generation as PDFs"
+    )
+    b.para(
+        "The slide branch passes clear_existing=false so it adds to, rather "
+        "than replaces, the transcript chunks already indexed under the same "
+        "doc_id. Re-ingesting the same URL overwrites the previous vectors "
+        "because the doc_id is derived from the video id."
+    )
+
+    b.section("Slide-scoped questions")
+    b.para(
+        "The reason to extract slides at all is to answer a very specific kind "
+        "of question: 'What did the author say about slide 7?'. When slide "
+        "extraction ran, DocuMind detects the slide N / page N reference and, "
+        "instead of a generic semantic search, returns a focused pair:"
+    )
+    b.numbered([
+        "Slide N's on-screen text — the OCR'd content of that slide.",
+        "The transcript spoken while slide N was visible — the segments bounded by [slide N timestamp, slide N+1 timestamp).",
+    ])
+    b.para(
+        "This works because slide chunks store metadata.timestamp (when the "
+        "slide appeared) and transcript chunks store start_time / end_time. The "
+        "retriever joins them on time, tags the spoken chunks with "
+        "aligned_slide_number, and the answer generator labels them 'Spoken "
+        "during slide N' so the LLM summarizes the narration for that slide "
+        "rather than returning an unrelated semantic hit."
+    )
+    b.bullets([
+        "Slide-scoped queries return only that slide plus its narration — no unrelated semantic results — which keeps citations tight.",
+        "If no narration was indexed for a slide's time window (a silent title card, say), the answer describes the on-screen text and notes that narration was not indexed for that segment.",
+        "Scoping applies to video documents only; for PDFs, 'page N' stays an ordinary semantic query.",
+    ])
+
+    b.section("Citations and preview")
+    b.para(
+        "YouTube-specific fields ride along in chunk.metadata and surface in "
+        "the API citations, so the frontend can render meaningful badges and "
+        "deep links:"
+    )
+    b.kv_table([
+        ("Transcript citation", "start_time, end_time, youtube_url — rendered like 'Transcript 8:12–8:55' and linked to the watch URL at the right timestamp."),
+        ("Slide citation", "slide_number, timestamp, youtube_url — rendered like 'Slide 6, extracted around 8:20'. A slide hit with a generated PDF also exposes page_number for an in-app preview jump."),
+    ])
+    b.para(
+        "A YouTube document stores source_path as the virtual path "
+        "youtube:{video_id}, not a file on disk. When slides were extracted, "
+        "the in-app preview resolves to "
+        "data/processed/youtube/{video_id}/slides.pdf. A transcript-only "
+        "lecture has no PDF, so the preview shows an explanatory message "
+        "instead of an error — chat still works from the indexed transcript."
+    )
+
+    b.section("Operating it")
+    b.para(
+        "The endpoint mirrors the PDF SSE ingest: POST /ingest/youtube/stream "
+        "accepts the URL and the two modality toggles, then streams progress "
+        "(progress / done / error) just like /ingest/stream. The done payload "
+        "extends the normal IngestResponse with video_id, title, "
+        "slides_pdf_path, and optional warnings."
+    )
+    b.code(
+        "curl -N -X POST http://localhost:8002/ingest/youtube/stream \\\n"
+        "  -H \"Content-Type: application/json\" \\\n"
+        "  -H \"Authorization: Bearer <session-token>\" \\\n"
+        "  -d '{\n"
+        "    \"url\": \"https://www.youtube.com/watch?v=VIDEO_ID\",\n"
+        "    \"include_transcript\": true,\n"
+        "    \"include_slides\": true,\n"
+        "    \"sample_every_seconds\": 2.0\n"
+        "  }'"
+    )
+    b.para(
+        "Three settings govern the feature (full table in Chapter 12): "
+        "YOUTUBE_INGEST_ENABLED gates the endpoint (503 when false), "
+        "TRANSCRIBER_PROVIDER selects openai Whisper or a mock for tests, and "
+        "YOUTUBE_SAMPLE_EVERY_SECONDS sets the frame-sampling interval. The "
+        "Docker image additionally needs ffmpeg, yt-dlp, "
+        "opencv-python-headless, and imagehash, all installed in "
+        "docker/Dockerfile."
+    )
+    b.note(
+        "the mock transcriber pitfall",
+        "TRANSCRIBER_PROVIDER=mock returns the same two hardcoded segments (~28 s of placeholder text) for every video, regardless of audio — handy for Docker smoke tests, misleading in real use. If a lecture shows only one or two transcript chunks of unrelated content, it was almost certainly ingested under mock. Set TRANSCRIBER_PROVIDER=openai, recreate the API container, and re-ingest the URL; the doc keeps its doc_id, so the re-ingest overwrites the mock vectors.",
+    )
+
+    b.section("Limitations")
+    b.bullets([
+        "Only ingest videos you have the right to process. YouTube support targets personal knowledge management, authorized lectures, and content you own or are permitted to analyze.",
+        "Slide deduplication uses perceptual hashing; fast scene changes or animated slides can produce extra pages.",
+        "Transcription quality and cost depend on the configured provider (openai Whisper by default).",
+        "Very long videos increase download, transcription, and indexing time; CPU-only hosts should expect multi-minute ingests.",
+    ])
+
+    # =========================================================================
     # Appendix A: repo layout
     # =========================================================================
     b.appendix("Appendix A — Repository Layout")
@@ -1727,7 +1877,7 @@ def build_book() -> BookBuilder:
         "RAG/\n"
         "|-- backend/\n"
         "|   |-- api/                 # FastAPI routers, schemas, monitoring, guardrails\n"
-        "|   |   |-- routers/         # health, query, ingest, bulk_ingest, admin\n"
+        "|   |   |-- routers/         # health, query, ingest, bulk_ingest, youtube, admin\n"
         "|   |   |-- monitoring/      # metrics.py, tracing.py\n"
         "|   |   |-- guardrails/      # pii.py (Presidio + spaCy)\n"
         "|   |   |-- main.py          # FastAPI app + lifespan + CORS + rate limiting\n"
@@ -1752,6 +1902,11 @@ def build_book() -> BookBuilder:
         "|   |   \\-- chunk_filters.py\n"
         "|   |-- generation/\n"
         "|   |   \\-- answer_generator.py\n"
+        "|   |-- video/                # YouTube ingest: download, transcribe, slides\n"
+        "|   |   |-- youtube_ingestor.py  # orchestrates transcript + slide indexing\n"
+        "|   |   |-- transcriber.py       # Whisper / mock providers\n"
+        "|   |   |-- frame_sampler.py     # sample + phash-dedup video frames\n"
+        "|   |   \\-- slide_pdf_builder.py # assemble sampled frames into slides.pdf\n"
         "|   |-- scaling/\n"
         "|   |   |-- workers.py       # Celery tasks (ingest_single_pdf_task, ...)\n"
         "|   |   |-- pipeline/        # ingest modes, scalable_ingest\n"
@@ -1883,7 +2038,9 @@ def build_book() -> BookBuilder:
         ("Qdrant", "Open-source vector database. DocuMind uses four collections — text_chunks, table_chunks, figure_chunks, page_chunks."),
         ("RAG", "Retrieval-Augmented Generation. The pattern this whole repository implements."),
         ("RRF", "Reciprocal Rank Fusion. A rank-based score combiner: 1 / (k + rank), summed across retrievers. k=60 by default. Robust because it ignores raw score scales."),
+        ("Slide alignment", "Joining transcript chunks to slides by time: the narration spoken during [slide N timestamp, slide N+1 timestamp) is tagged aligned_slide_number=N and labeled 'Spoken during slide N' for the LLM. Powers slide-scoped questions (Chapter 13)."),
         ("SSE", "Server-Sent Events. The transport DocuMind uses for /ingest/stream progress and (in the future) /query/stream token streaming."),
+        ("Transcript chunk", "A timestamped slice of a transcribed video's audio (ChunkType.TRANSCRIPT), stored in the text_chunks collection under a youtube:{video_id} doc_id. Carries start_time / end_time for time-based slide alignment."),
         ("Stable doc ID", "The deterministic 16-character SHA-256 prefix of the path-from-raw of a PDF. The primary key for everything related to a document."),
         ("Section path", "The heading chain ('Executive Summary > Q4 Highlights') attached to each chunk by USE_SECTION_PATHS=true. Improves both retrieval and the LLM's situational awareness."),
         ("Taxonomy guard", "The RDF-based conformity check that scores generated answers against allowed and forbidden classifications."),

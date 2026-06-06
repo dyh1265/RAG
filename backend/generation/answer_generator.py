@@ -68,6 +68,8 @@ def _passage_label(chunk) -> str:
 
     page = chunk.page_number if chunk.page_number is not None else "?"
     label = _chunk_type_label(chunk.chunk_type)
+    if chunk.section_path:
+        return f'page {page}, section "{chunk.section_path}", {label}'
     return f"page {page}, {label}"
 
 
@@ -90,7 +92,9 @@ def _build_context_block(contexts: list[RetrievedContext]) -> str:
     blocks: list[str] = []
     for idx, ctx in enumerate(contexts, start=1):
         chunk = ctx.chunk
-        blocks.append(f"[{idx}] ({_passage_label(chunk)})\n{chunk.content.strip()}")
+        # Use enriched_content so document/section prefixes indexed at ingest are
+        # visible to the LLM (e.g. "Section: Revenue Analysis" above the body).
+        blocks.append(f"[{idx}] ({_passage_label(chunk)})\n{chunk.enriched_content.strip()}")
     return "\n\n".join(blocks)
 
 

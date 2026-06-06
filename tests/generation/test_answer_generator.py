@@ -70,6 +70,29 @@ def test_generate_openai_calls_api_and_builds_citations():
     assert call_kwargs[0][0] == "https://api.openai.com/v1/chat/completions"
 
 
+def test_build_context_block_includes_section_for_pdf():
+    chunk = make_chunk(
+        chunk_id="rev",
+        content=(
+            "Figure 3 below shows quarterly revenue from Q1 2024 through Q1 2025. "
+            "The chart illustrates a consistent upward trend."
+        ),
+        page_number=2,
+    ).model_copy(
+        update={
+            "section_path": "Revenue Analysis",
+            "context_prefix": "Document: sample report\nSection: Revenue Analysis",
+        }
+    )
+    contexts = [make_context(chunk_id="rev", content=chunk.content, page_number=2)]
+    contexts[0].chunk = chunk
+
+    block = _build_context_block(contexts)
+    assert 'section "Revenue Analysis"' in block
+    assert "Section: Revenue Analysis" in block
+    assert "Figure 3 below shows" in block
+
+
 def test_build_context_block_youtube_slide_and_transcript():
     contexts = [
         make_context(
