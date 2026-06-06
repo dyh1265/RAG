@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("qdrant_client")
 
 from backend.core.models import ChunkType, DocumentChunk, DocumentType, EmbeddedChunk
-from backend.ingestion.stores.qdrant_store import QdrantStore
+from backend.ingestion.stores.qdrant_store import QdrantStore, tenant_point_id
 
 
 def _make_store() -> QdrantStore:
@@ -31,13 +31,15 @@ def _make_store() -> QdrantStore:
     return store
 
 
-def _embedded_chunk(doc_id: str = "doc1") -> EmbeddedChunk:
+def _embedded_chunk(doc_id: str = "doc1", chunk_id: str | None = None) -> EmbeddedChunk:
+    kwargs = {"id": chunk_id} if chunk_id else {}
     chunk = DocumentChunk(
         doc_id=doc_id,
         source_path="/data/raw/uploads/abc.pdf",
         doc_type=DocumentType.PDF,
         chunk_type=ChunkType.TEXT,
         content="Sample text.",
+        **kwargs,
     )
     return EmbeddedChunk(chunk=chunk, vector=[0.1, 0.2, 0.3, 0.4], model_name="test")
 
@@ -50,6 +52,55 @@ def test_upsert_stamps_tenant_id_in_payload():
     points = call.kwargs["points"]
     assert points[0].payload["tenant_id"] == "tenant-42"
     assert points[0].payload["doc_id"] == "doc1"
+
+
+def test_upsert_namespaces_point_id_by_tenant():
+    """Point id must be tenant-scoped, with the original chunk id kept in payload."""
+    store = _make_store()
+    store.upsert([_embedded_chunk(chunk_id="chunk-xyz")], tenant_id="tenant-42")
+
+    points = store.client.upsert.call_args.kwargs["points"]
+    assert points[0].id == tenant_point_id("tenant-42", "chunk-xyz")
+    assert points[0].id != "chunk-xyz"
+    assert points[0].payload["chunk_id"] == "chunk-xyz"
+
+
+def test_upsert_same_chunk_id_differs_across_tenants():
+    """Two tenants ingesting an identical deterministic chunk id must not collide."""
+    store_a = _make_store()
+    store_a.upsert([_embedded_chunk(chunk_id="shared")], tenant_id="tenant-A")
+    id_a = store_a.client.upsert.call_args.kwargs["points"][0].id
+
+    store_b = _make_store()
+    store_b.upsert([_embedded_chunk(chunk_id="shared")], tenant_id="tenant-B")
+    id_b = store_b.client.upsert.call_args.kwargs["points"][0].id
+
+    assert id_a != id_b
+
+
+def test_payload_to_chunk_restores_original_chunk_id():
+    payload = {
+        "doc_id": "doc-1",
+        "chunk_id": "original-chunk-id",
+        "source_path": "/data/report.pdf",
+        "chunk_type": "text",
+        "content": "Revenue grew.",
+    }
+    chunk = QdrantStore._payload_to_chunk(payload, "namespaced-point-id")
+    assert chunk.id == "original-chunk-id"
+
+
+def test_get_chunks_by_ids_resolves_tenant_point_ids():
+    """parent-expand passes original ids; the store maps them to namespaced ids."""
+    store = _make_store()
+    store.client.retrieve.return_value = []
+
+    store.get_chunks_by_ids("text_chunks", {"parent-1"}, tenant_id="tenant-42")
+
+    requested = set(store.client.retrieve.call_args.kwargs["ids"])
+    assert tenant_point_id("tenant-42", "parent-1") in requested
+    # Raw id retained so legacy points written before namespacing still resolve.
+    assert "parent-1" in requested
 
 
 def test_delete_doc_includes_tenant_filter():

@@ -489,6 +489,7 @@ class MultiModalRetriever:
     def _expand_parent_contexts(
         self,
         contexts: list[RetrievedContext],
+        tenant_id: str | None = None,
     ) -> list[RetrievedContext]:
         if not self.use_parent_expand:
             return contexts
@@ -500,6 +501,7 @@ class MultiModalRetriever:
         parents = self.store.get_chunks_by_ids(
             COLLECTION_MAP[ChunkType.TEXT],
             parent_ids,
+            tenant_id=tenant_id,
         )
         parent_map = {
             parent.id: RetrievedContext(
@@ -586,6 +588,7 @@ class MultiModalRetriever:
         doc_filters = dict(request.filters or {})
         doc_scoped = bool(doc_filters.get("doc_id"))
         doc_id = str(doc_filters.get("doc_id") or "")
+        tenant_id = doc_filters.get("tenant_id")
         asset_ref = parse_asset_reference(request.query)
         asset_hits: list[RetrievedContext] = []
         if doc_scoped and asset_ref is not None:
@@ -608,7 +611,7 @@ class MultiModalRetriever:
                                 rank=rank,
                             )
                         )
-                    return self._expand_parent_contexts(reranked)
+                    return self._expand_parent_contexts(reranked, tenant_id)
 
         q_lower = request.query.lower()
         hybrid_handled_pages = False
@@ -668,4 +671,4 @@ class MultiModalRetriever:
             )
         if asset_hits:
             results = _prepend_unique(asset_hits, results, request.top_k)
-        return self._expand_parent_contexts(results)
+        return self._expand_parent_contexts(results, tenant_id)

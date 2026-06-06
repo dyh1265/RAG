@@ -5,11 +5,25 @@ Handles collection creation, upserting embedded chunks, and similarity search.
 
 from __future__ import annotations
 
+import uuid
+
 from backend.core.config import get_settings
 from backend.core.models import ChunkType, DocumentChunk, DocumentType, EmbeddedChunk, RetrievalStrategy, RetrievedContext
 
 COLPALI_PAGE_DIM = 128
 TEXT_PAGE_DIM = 1024
+
+
+def tenant_point_id(tenant_id: str, chunk_id: str) -> str:
+    """Namespace a chunk id by tenant for use as the Qdrant point id.
+
+    Chunk ids are deterministic (e.g. a YouTube transcript id derives from the
+    video id + timestamps), so two tenants ingesting the same source would
+    otherwise produce identical point ids and silently overwrite each other's
+    vectors. Folding the tenant into a UUID keeps points physically distinct
+    while the original chunk id is preserved in the payload (``chunk_id``).
+    """
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"{tenant_id}:{chunk_id}"))
 
 
 COLLECTION_MAP: dict[ChunkType, str] = {
@@ -143,11 +157,12 @@ class QdrantStore:
 
             points = [
                 PointStruct(
-                    id=ec.chunk.id,
+                    id=tenant_point_id(tenant_id, ec.chunk.id),
                     vector=ec.vector,
                     payload={
                         "doc_id": ec.chunk.doc_id,
                         "tenant_id": tenant_id,
+                        "chunk_id": ec.chunk.id,
                         "source_path": ec.chunk.source_path,
                         "doc_type": ec.chunk.doc_type.value,
                         "chunk_type": ec.chunk.chunk_type.value,
@@ -282,7 +297,9 @@ class QdrantStore:
         except ValueError:
             doc_type = DocumentType.PDF
         return DocumentChunk(
-            id=str(point_id),
+            # Prefer the original chunk id stored in payload; fall back to the
+            # Qdrant point id for legacy points written before tenant namespacing.
+            id=str(payload.get("chunk_id") or point_id),
             doc_id=payload["doc_id"],
             source_path=payload["source_path"],
             doc_type=doc_type,
@@ -342,8 +359,16 @@ class QdrantStore:
         self,
         collection_name: str,
         chunk_ids: set[str],
+        *,
+        tenant_id: str | None = None,
     ) -> list[DocumentChunk]:
-        """Fetch chunks by point id (used for parent-expand)."""
+        """Fetch chunks by original chunk id (used for parent-expand).
+
+        Point ids are tenant-namespaced, so the caller passes the original chunk
+        ids (as stored in ``metadata.parent_chunk_id``) plus the ``tenant_id``;
+        we resolve them to the namespaced point ids here. The raw ids are also
+        retrieved so legacy points written before namespacing still resolve.
+        """
         if not chunk_ids:
             return []
 
@@ -351,9 +376,13 @@ class QdrantStore:
         if collection_name not in existing:
             return []
 
+        lookup_ids: set[str] = set(chunk_ids)
+        if tenant_id is not None:
+            lookup_ids |= {tenant_point_id(tenant_id, cid) for cid in chunk_ids}
+
         records = self.client.retrieve(
             collection_name=collection_name,
-            ids=list(chunk_ids),
+            ids=list(lookup_ids),
             with_payload=True,
             with_vectors=False,
         )
