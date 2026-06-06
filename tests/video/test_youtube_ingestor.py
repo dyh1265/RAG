@@ -70,7 +70,6 @@ def test_ingestor_indexes_transcript_via_index_chunks(tmp_path):
         )
 
     pipeline.index_chunks.assert_called_once()
-    call_kwargs = pipeline.index_chunks.call_args.kwargs
     chunks = pipeline.index_chunks.call_args.args[0]
     assert len(chunks) >= 1
     assert chunks[0].metadata["video_id"] == VIDEO_ID

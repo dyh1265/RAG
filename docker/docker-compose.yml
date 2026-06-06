@@ -120,6 +120,7 @@ services:
       USE_OCR: "true"
       YOUTUBE_INGEST_ENABLED: "true"
       TRANSCRIBER_PROVIDER: "${TRANSCRIBER_PROVIDER:-openai}"
+      OLLAMA_BASE_URL: "${OLLAMA_BASE_URL:-http://host.docker.internal:11434}"
     volumes:
       - ../data:/app/data
       - ../backend:/app/backend
