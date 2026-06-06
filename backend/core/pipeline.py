@@ -296,7 +296,7 @@ class RAGPipeline:
             self._emit_progress(
                 on_progress, "indexing", "Clearing previous vectors for document…"
             )
-            self.store.delete_doc(doc_id)
+            self.store.delete_doc(doc_id, tenant_id=tenant_id)
         invalidate_retrieval_caches(doc_id)
 
         self._emit_progress(

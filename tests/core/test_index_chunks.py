@@ -60,7 +60,7 @@ def test_index_chunks_indexes_prebuilt_chunks_without_parsing():
 
     pipeline._ingestion.parse_safe.assert_not_called()
     embed.assert_called_once()
-    store.delete_doc.assert_called_once_with("youtube_abc123")
+    store.delete_doc.assert_called_once_with("youtube_abc123", tenant_id="public")
     store.upsert.assert_called_once()
 
     assert result.doc_id == "youtube_abc123"
@@ -110,6 +110,29 @@ def test_index_chunks_empty_returns_no_chunks():
     store.upsert.assert_not_called()
     assert result.chunk_count == 0
     assert result.errors == ["No chunks extracted"]
+
+
+def test_index_chunks_clears_only_within_tenant():
+    """Re-ingest must scope vector deletion to the caller's tenant.
+
+    YouTube doc_ids are deterministic from the video id, so two tenants ingesting
+    the same video share a doc_id; an unscoped delete would wipe the other tenant.
+    """
+    chunk = _video_chunk()
+    store = MagicMock()
+    embedded = MagicMock(chunk=chunk, vector=[0.1], model_name="bge-m3")
+
+    pipeline = RAGPipeline(_ingest_only_config(), store=store)
+
+    with patch("backend.core.pipeline.embed_chunks", return_value=[embedded]):
+        pipeline.index_chunks(
+            [chunk],
+            doc_id="youtube_abc123",
+            source_path="youtube:abc123",
+            tenant_id="tenant-A",
+        )
+
+    store.delete_doc.assert_called_once_with("youtube_abc123", tenant_id="tenant-A")
 
 
 def test_index_chunks_respects_clear_existing_false():

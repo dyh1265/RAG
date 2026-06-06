@@ -1,3 +1,25 @@
+# Fix: tenant isolation for re-ingest + doc-scoped retrieval
+
+## Plan
+- [x] index_chunks(): pass tenant_id to store.delete_doc (was deleting across tenants for shared YouTube doc_ids)
+- [x] Thread tenant+doc filter into retriever helper scrolls (hybrid, labeled figures/tables/algorithms, slide-scoped)
+- [x] Tenant-scope expand_split_list_items scroll (optional filters kwarg)
+- [x] Tests: tenant-scoped delete + tenant-filtered slide-scoped scroll
+- [x] Run full suite
+
+## Review
+### Verification
+- tests/core/test_index_chunks.py + tests/retrieval — 41 passed
+- Full non-integration suite — 183 passed, 0 failures
+### Behavior diff
+- Re-ingesting a YouTube video as tenant A no longer wipes tenant B's copy (deterministic doc_id collision)
+- Labeled-asset, slide-scoped, hybrid, and list-expand scrolls now carry tenant_id from request.filters; previously doc_id-only filters could read another tenant's chunks on doc_id collision
+### Residual risks
+- expand_split_list_items keeps a doc_id-only fallback for direct/test callers; production path always passes scoped filters
+- Relies on request.filters carrying tenant_id (set by the query route)
+
+---
+
 # Feature: slide/page-scoped questions for YouTube lectures
 
 ## Plan

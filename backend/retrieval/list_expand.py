@@ -37,13 +37,20 @@ def expand_split_list_items(
     doc_id: str,
     contexts: list[RetrievedContext],
     top_k: int,
+    *,
+    filters: dict | None = None,
 ) -> list[RetrievedContext]:
     """
     When list items were chunked per line across pages, ensure all siblings
     from the same doc/page window are included (e.g. four architectural views).
+
+    ``filters`` should be the tenant- and doc-scoped query filter; when omitted it
+    falls back to a doc_id-only scope (kept for direct/test callers).
     """
     if not contexts or not doc_id:
         return contexts
+
+    scroll_filters = filters if filters is not None else {"doc_id": doc_id}
 
     seed_pages: set[int] = set()
     for ctx in contexts:
@@ -59,7 +66,7 @@ def expand_split_list_items(
     pages = _page_window(seed_pages)
     corpus = store.scroll_collection(
         COLLECTION_MAP[ChunkType.TEXT],
-        filters={"doc_id": doc_id},
+        filters=scroll_filters,
     )
 
     sibling_map: dict[str, RetrievedContext] = {}

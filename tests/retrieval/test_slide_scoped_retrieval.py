@@ -126,6 +126,38 @@ def test_page_query_on_non_video_doc_returns_no_slide_hits():
     assert all(r.score != 100.0 for r in results)
 
 
+def test_slide_scoped_scroll_is_tenant_filtered():
+    """Slide-scoped scroll must carry tenant_id so colliding doc_ids stay isolated."""
+    pages = [_slide_page(1, 10.0), _slide_page(2, 50.0)]
+    texts = [_slide_text(2, 50.0, "Slide 2 content")]
+    seen_filters: list[dict] = []
+
+    store = MagicMock()
+
+    def scroll(collection_name, *, filters=None):
+        seen_filters.append(filters or {})
+        if collection_name == COLLECTION_MAP[ChunkType.PAGE_IMAGE]:
+            return pages
+        if collection_name == COLLECTION_MAP[ChunkType.TEXT]:
+            return texts
+        return []
+
+    store.scroll_collection.side_effect = scroll
+    retriever = _build_retriever(store)
+
+    retriever.retrieve(
+        QueryRequest(
+            query="slide 2",
+            top_k=5,
+            filters={"doc_id": "vid-1", "tenant_id": "tenant-A"},
+        )
+    )
+
+    assert seen_filters, "expected at least one scoped scroll"
+    assert all(f.get("tenant_id") == "tenant-A" for f in seen_filters)
+    assert all(f.get("doc_id") == "vid-1" for f in seen_filters)
+
+
 def test_last_slide_window_extends_to_end():
     pages = [_slide_page(1, 10.0), _slide_page(2, 50.0)]
     texts = [

@@ -235,18 +235,19 @@ class MultiModalRetriever:
         request: QueryRequest,
         fetch_k: int,
     ) -> list[RetrievedContext] | None:
-        doc_id = (request.filters or {}).get("doc_id")
+        doc_filters = dict(request.filters or {})
+        doc_id = doc_filters.get("doc_id")
         if not self.use_hybrid or not doc_id:
             return None
         corpus = self.store.scroll_collection(
             COLLECTION_MAP[ChunkType.TEXT],
-            filters={"doc_id": doc_id},
+            filters=doc_filters,
         )
         include_page_corpus = not self.use_colpali
         if include_page_corpus:
             page_corpus = self.store.scroll_collection(
                 COLLECTION_MAP[ChunkType.PAGE_IMAGE],
-                filters={"doc_id": doc_id},
+                filters=doc_filters,
             )
             page_corpus = [
                 chunk for chunk in page_corpus if is_substantive_content(chunk.content)
@@ -254,7 +255,7 @@ class MultiModalRetriever:
             corpus = corpus + page_corpus
         table_corpus = self.store.scroll_collection(
             COLLECTION_MAP[ChunkType.TABLE],
-            filters={"doc_id": doc_id},
+            filters=doc_filters,
         )
         if table_corpus:
             corpus = corpus + table_corpus
@@ -277,16 +278,20 @@ class MultiModalRetriever:
 
     def _fetch_labeled_asset_chunks(
         self,
-        doc_id: str,
+        filters: dict,
         kind: str,
         number: str,
     ) -> list[RetrievedContext]:
-        """Scroll collections and return chunks for the named table/figure/algorithm."""
+        """Scroll collections and return chunks for the named table/figure/algorithm.
+
+        ``filters`` is the tenant- and doc-scoped filter from the query so labeled
+        asset lookups never cross tenant boundaries when doc_ids collide.
+        """
         if kind == "figure":
-            return self._fetch_labeled_figures(doc_id, number)
+            return self._fetch_labeled_figures(filters, number)
         if kind == "algorithm":
-            return self._fetch_labeled_algorithms(doc_id, number)
-        return self._fetch_labeled_tables(doc_id, number)
+            return self._fetch_labeled_algorithms(filters, number)
+        return self._fetch_labeled_tables(filters, number)
 
     def _labeled_hit(self, chunk) -> RetrievedContext:
         return RetrievedContext(
@@ -296,10 +301,10 @@ class MultiModalRetriever:
             rank=0,
         )
 
-    def _fetch_labeled_figures(self, doc_id: str, number: str) -> list[RetrievedContext]:
+    def _fetch_labeled_figures(self, filters: dict, number: str) -> list[RetrievedContext]:
         chunks = self.store.scroll_collection(
             COLLECTION_MAP[ChunkType.FIGURE],
-            filters={"doc_id": doc_id},
+            filters=filters,
         )
         return [
             self._labeled_hit(chunk)
@@ -307,10 +312,10 @@ class MultiModalRetriever:
             if content_matches_asset_label(chunk.content, "figure", number)
         ]
 
-    def _fetch_labeled_tables(self, doc_id: str, number: str) -> list[RetrievedContext]:
+    def _fetch_labeled_tables(self, filters: dict, number: str) -> list[RetrievedContext]:
         table_chunks = self.store.scroll_collection(
             COLLECTION_MAP[ChunkType.TABLE],
-            filters={"doc_id": doc_id},
+            filters=filters,
         )
         direct = [
             self._labeled_hit(chunk)
@@ -324,7 +329,7 @@ class MultiModalRetriever:
         anchor_pages: set[int] = set()
         for text_chunk in self.store.scroll_collection(
             COLLECTION_MAP[ChunkType.TEXT],
-            filters={"doc_id": doc_id},
+            filters=filters,
         ):
             if not content_matches_asset_label(text_chunk.content, "table", number):
                 continue
@@ -349,11 +354,11 @@ class MultiModalRetriever:
                 return [self._labeled_hit(ordered[ordinal])]
         return []
 
-    def _fetch_labeled_algorithms(self, doc_id: str, number: str) -> list[RetrievedContext]:
+    def _fetch_labeled_algorithms(self, filters: dict, number: str) -> list[RetrievedContext]:
         """Return algorithm title + pseudocode blocks on the anchor page(s)."""
         text_chunks = self.store.scroll_collection(
             COLLECTION_MAP[ChunkType.TEXT],
-            filters={"doc_id": doc_id},
+            filters=filters,
         )
         anchors = [
             c
@@ -402,7 +407,7 @@ class MultiModalRetriever:
         return hits
 
     def _fetch_slide_scoped_chunks(
-        self, doc_id: str, slide_number: int
+        self, filters: dict, slide_number: int
     ) -> list[RetrievedContext]:
         """For a YouTube lecture, return slide N plus the transcript spoken while it showed.
 
@@ -426,7 +431,7 @@ class MultiModalRetriever:
 
         page_chunks = self.store.scroll_collection(
             COLLECTION_MAP[ChunkType.PAGE_IMAGE],
-            filters={"doc_id": doc_id},
+            filters=filters,
         )
         for chunk in page_chunks:
             md = chunk.metadata or {}
@@ -446,7 +451,7 @@ class MultiModalRetriever:
 
         text_chunks = self.store.scroll_collection(
             COLLECTION_MAP[ChunkType.TEXT],
-            filters={"doc_id": doc_id},
+            filters=filters,
         )
         slide_content = [
             chunk
@@ -575,19 +580,23 @@ class MultiModalRetriever:
 
         result_lists: list[list[RetrievedContext]] = []
         list_weights: list[float] = []
-        doc_scoped = bool((request.filters or {}).get("doc_id"))
-        doc_id = str((request.filters or {}).get("doc_id") or "")
+        # Carries both tenant_id and doc_id from the query route; passed verbatim to
+        # every helper scroll so doc-scoped lookups stay tenant-isolated even when
+        # deterministic doc_ids (e.g. a shared YouTube video) collide across tenants.
+        doc_filters = dict(request.filters or {})
+        doc_scoped = bool(doc_filters.get("doc_id"))
+        doc_id = str(doc_filters.get("doc_id") or "")
         asset_ref = parse_asset_reference(request.query)
         asset_hits: list[RetrievedContext] = []
         if doc_scoped and asset_ref is not None:
             kind, number = asset_ref
-            asset_hits = self._fetch_labeled_asset_chunks(doc_id, kind, number)
+            asset_hits = self._fetch_labeled_asset_chunks(doc_filters, kind, number)
 
         slide_hits: list[RetrievedContext] = []
         if doc_scoped and asset_ref is None:
             page_ref = parse_page_reference(request.query)
             if page_ref is not None:
-                slide_hits = self._fetch_slide_scoped_chunks(doc_id, page_ref)
+                slide_hits = self._fetch_slide_scoped_chunks(doc_filters, page_ref)
                 if slide_hits:
                     reranked: list[RetrievedContext] = []
                     for rank, ctx in enumerate(slide_hits[: request.top_k], start=1):
@@ -654,7 +663,9 @@ class MultiModalRetriever:
 
         results = prefer_substantive_contexts(results, request.top_k)
         if doc_scoped:
-            results = expand_split_list_items(self.store, doc_id, results, request.top_k)
+            results = expand_split_list_items(
+                self.store, doc_id, results, request.top_k, filters=doc_filters
+            )
         if asset_hits:
             results = _prepend_unique(asset_hits, results, request.top_k)
         return self._expand_parent_contexts(results)
